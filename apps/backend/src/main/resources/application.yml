@@ -1,0 +1,58 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:h2:mem:hub;MODE=MySQL;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=VALUE}
+    username: ${DB_USER:sa}
+    password: ${DB_PASS:}
+    hikari:
+      initialization-fail-timeout: 0
+      connection-timeout: 60000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    locations: classpath:db/migration/{vendor}
+    baseline-on-migrate: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+
+hub:
+  github:
+    org-default: ${GITHUB_ORG_DEFAULT:}
+    app-id: ${GITHUB_APP_ID:}
+    installation-id: ${GITHUB_INSTALLATION_ID:0}
+    webhook-secret: ${GITHUB_WEBHOOK_SECRET:}
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    model: ${OPENAI_MODEL:gpt-4.1-mini}
+  codex:
+    api-url: ${CODEX_API_URL:https://api.openai.com}
+    model: ${CODEX_MODEL:gpt-5-codex}
+    economy-model: ${CODEX_MODEL_ECONOMY:gpt-4.1-mini}
+    pricing:
+      models:
+        gpt-5-codex:
+          input: 1.25 # US$ 1.25 por 1M de tokens de entrada
+          cached-input: 0.50 # US$ 0.50 por 1M de tokens de entrada cacheados
+          output: 10.0 # US$ 10.00 por 1M de tokens de saída
+        gpt-4.1-mini:
+          input: 0.15 # US$ 0.15 por 1M de tokens de entrada
+          cached-input: 0.06 # US$ 0.06 por 1M de tokens de entrada cacheados
+          output: 0.60 # US$ 0.60 por 1M de tokens de saída
+  logs:
+    max-chars: 20000
+
+server:
+  port: 8081
+
+springdoc:
+  swagger-ui:
+    path: /swagger
+    display-request-duration: true
+  api-docs:
+    path: /api-docs
