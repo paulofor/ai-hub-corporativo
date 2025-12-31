@@ -227,14 +227,14 @@ ensure_deploy_key() {
         mv "${key_file}" "${key_file}.backup.${ts}" 2>/dev/null || true
         mv "${pub_file}" "${pub_file}.backup.${ts}" 2>/dev/null || true
         echo "Backups criados com sufixo .backup.${ts}."
-        ssh-keygen -t ed25519 -C "ai-hub-deploy" -N "" -f "${key_file}"
+        ssh-keygen -t ed25519 -C "ai-hub-corporativo-deploy" -N "" -f "${key_file}"
         ;;
       *)
         echo "Mantendo chave existente."
         ;;
     esac
   else
-    ssh-keygen -t ed25519 -C "ai-hub-deploy" -N "" -f "${key_file}"
+    ssh-keygen -t ed25519 -C "ai-hub-corporativo-deploy" -N "" -f "${key_file}"
   fi
 
   chmod 600 "${key_file}" 2>/dev/null || true
@@ -244,7 +244,7 @@ ensure_deploy_key() {
   touch "${authorized_keys}"
   chmod 600 "${authorized_keys}"
 
-  if ! grep -q "ai-hub-deploy" "${authorized_keys}" 2>/dev/null; then
+  if ! grep -q "ai-hub-corporativo-deploy" "${authorized_keys}" 2>/dev/null; then
     cat "${pub_file}" >> "${authorized_keys}"
     echo "Chave pública adicionada a ${authorized_keys}."
   else
@@ -314,7 +314,7 @@ collect_env_values() {
   cat <<'EOF'
 
 Referência rápida para preencher as credenciais da GitHub App:
-  • GitHub → Settings → Developer settings → GitHub Apps → escolha a app (ex.: ai-hub-automations).
+  • GitHub → Settings → Developer settings → GitHub Apps → escolha a app (ex.: ai-hub-corporativo-automations).
   • Aba General → seção About: copie o número "App ID" (ex.: 212632) para GITHUB_APP_ID.
   • Aba General → clique em "Generate a private key" caso ainda não tenha o arquivo .pem.
   • Aba General → seção Webhook: clique em Edit para ver/definir o segredo usado em GITHUB_WEBHOOK_SECRET.
@@ -387,9 +387,9 @@ create_env_file() {
     printf 'FRONTEND_HTTP_PORT=%s\n' "${FRONTEND_HTTP_PORT}"
     printf 'BACKEND_HTTP_PORT=%s\n' "${BACKEND_HTTP_PORT}"
     printf 'SANDBOX_ORCHESTRATOR_HTTP_PORT=%s\n' "${SANDBOX_ORCHESTRATOR_HTTP_PORT}"
-    printf 'BACKEND_IMAGE=%s\n' "${BACKEND_IMAGE:-ghcr.io/paulodb/ai-hub-backend:latest}"
-    printf 'FRONTEND_IMAGE=%s\n' "${FRONTEND_IMAGE:-ghcr.io/paulodb/ai-hub-frontend:latest}"
-    printf 'SANDBOX_ORCHESTRATOR_IMAGE=%s\n' "${SANDBOX_ORCHESTRATOR_IMAGE:-ghcr.io/paulodb/ai-hub-sandbox:latest}"
+    printf 'BACKEND_IMAGE=%s\n' "${BACKEND_IMAGE:-ghcr.io/paulodb/ai-hub-corporativo-backend:latest}"
+    printf 'FRONTEND_IMAGE=%s\n' "${FRONTEND_IMAGE:-ghcr.io/paulodb/ai-hub-corporativo-frontend:latest}"
+    printf 'SANDBOX_ORCHESTRATOR_IMAGE=%s\n' "${SANDBOX_ORCHESTRATOR_IMAGE:-ghcr.io/paulodb/ai-hub-corporativo-sandbox:latest}"
   } > "${env_file}"
 
   chmod 600 "${env_file}"

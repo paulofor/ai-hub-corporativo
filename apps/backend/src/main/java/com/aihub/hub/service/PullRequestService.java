@@ -41,7 +41,7 @@ public class PullRequestService {
                                 String explanation) {
         JsonNode branchData = githubApiClient.getBranch(owner, repo, baseBranch);
         String baseSha = branchData.get("object").get("sha").asText();
-        String newBranch = "ai-hub/fix-" + Instant.now().getEpochSecond();
+        String newBranch = "ai-hub-corporativo/fix-" + Instant.now().getEpochSecond();
         githubApiClient.createBranch(owner, repo, newBranch, baseSha);
 
         Map<String, AppliedDiff> parsed = diffApplier.parse(diff);

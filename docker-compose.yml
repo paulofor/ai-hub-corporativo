@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ${BACKEND_IMAGE:-ghcr.io/paulodb/ai-hub-backend:latest}
+    image: ${BACKEND_IMAGE:-ghcr.io/paulodb/ai-hub-corporativo-backend:latest}
     build:
       context: ./apps/backend
     command: >
@@ -23,7 +23,7 @@ services:
         aliases:
           - backend
   frontend:
-    image: ${FRONTEND_IMAGE:-ghcr.io/paulodb/ai-hub-frontend:latest}
+    image: ${FRONTEND_IMAGE:-ghcr.io/paulodb/ai-hub-corporativo-frontend:latest}
     build:
       context: ./apps/frontend
     env_file:
@@ -39,7 +39,7 @@ services:
         aliases:
           - aihub-frontend
   sandbox-orchestrator:
-    image: ${SANDBOX_ORCHESTRATOR_IMAGE:-ghcr.io/paulodb/ai-hub-sandbox:latest}
+    image: ${SANDBOX_ORCHESTRATOR_IMAGE:-ghcr.io/paulodb/ai-hub-corporativo-sandbox:latest}
     build:
       context: ./apps/sandbox-orchestrator
     env_file:
@@ -47,7 +47,7 @@ services:
       - .env
     volumes:
       - ${OPENAI_TOKEN_HOST_DIR:-/root/infra/openai-token}:/run/secrets/openai-token:ro
-      - ${SANDBOX_WORKDIR:-/root/ai-hub/src}:${SANDBOX_WORKDIR:-/root/ai-hub/src}
+      - ${SANDBOX_WORKDIR:-/root/ai-hub-corporativo/src}:${SANDBOX_WORKDIR:-/root/ai-hub-corporativo/src}
     ports:
       - "${SANDBOX_ORCHESTRATOR_HTTP_PORT:-8083}:8080"
     command: >

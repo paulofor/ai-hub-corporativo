@@ -293,7 +293,7 @@ public class GithubAppAuth {
                 candidates.add(springConfigDir);
             }
 
-            Path workspaceRoot = Path.of("/workspace/ai-hub").resolve(provided).normalize();
+            Path workspaceRoot = Path.of("/workspace/ai-hub-corporativo").resolve(provided).normalize();
             if (!candidates.contains(workspaceRoot)) {
                 candidates.add(workspaceRoot);
             }

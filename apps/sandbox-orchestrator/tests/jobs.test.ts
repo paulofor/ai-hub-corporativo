@@ -119,7 +119,7 @@ test('respects SANDBOX_WORKDIR when creating workspaces', async () => {
 
     await processor.process(job);
 
-    assert.ok(job.sandboxPath?.startsWith(path.join(customBase, 'ai-hub-')));
+    assert.ok(job.sandboxPath?.startsWith(path.join(customBase, 'ai-hub-corporativo-')));
     assert.ok(job.logs.some((entry) => entry.includes(customBase)));
   } finally {
     if (originalWorkdir === undefined) {
@@ -943,8 +943,8 @@ test('pushes changes and opens a pull request when credentials are present', asy
 
   await processor.process(job);
 
-  const heads = execSync(`git ls-remote ${bareRepo} refs/heads/ai-hub/cifix-${job.jobId}`);
-  assert.ok(heads.toString().includes(`ai-hub/cifix-${job.jobId}`));
+  const heads = execSync(`git ls-remote ${bareRepo} refs/heads/ai-hub-corporativo/cifix-${job.jobId}`);
+  assert.ok(heads.toString().includes(`ai-hub-corporativo/cifix-${job.jobId}`));
   assert.equal(job.pullRequestUrl, 'https://github.com/example/repo/pull/1');
   assert.ok(fetchCalls.length > 0, 'fetch não foi chamado para criar PR');
   assert.ok(
@@ -1142,8 +1142,8 @@ test('reuses repository credentials from repoUrl when creating a pull request', 
 
   await processor.process(job);
 
-  const pushedBranch = execSync(`git ls-remote ${bareRepo} refs/heads/ai-hub/cifix-${job.jobId}`);
-  assert.ok(pushedBranch.toString().includes(`ai-hub/cifix-${job.jobId}`));
+  const pushedBranch = execSync(`git ls-remote ${bareRepo} refs/heads/ai-hub-corporativo/cifix-${job.jobId}`);
+  assert.ok(pushedBranch.toString().includes(`ai-hub-corporativo/cifix-${job.jobId}`));
   assert.equal(job.pullRequestUrl, 'https://github.com/example/repo/pull/2');
   assert.ok(fetchCalls.length > 0, 'fetch não foi chamado para criar PR');
   assert.ok(

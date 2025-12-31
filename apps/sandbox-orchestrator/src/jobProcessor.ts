@@ -167,8 +167,8 @@ export class SandboxJobProcessor implements JobProcessor {
     }
 
     try {
-      const workspace = await fs.mkdtemp(path.join(baseDir, `ai-hub-${job.jobId}-`));
-      this.log(job, `workspace temporário usando ${baseDir} criado com prefixo ai-hub-${job.jobId}-`);
+      const workspace = await fs.mkdtemp(path.join(baseDir, `ai-hub-corporativo-${job.jobId}-`));
+      this.log(job, `workspace temporário usando ${baseDir} criado com prefixo ai-hub-corporativo-${job.jobId}-`);
       return workspace;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -882,9 +882,9 @@ Modo econômico ativo: minimize leituras extensas, priorize comandos curtos, esc
       return;
     }
 
-    const branchName = `ai-hub/cifix-${job.jobId}`;
+    const branchName = `ai-hub-corporativo/cifix-${job.jobId}`;
     try {
-      await exec('git config user.email "ai-hub-bot@example.com"', { cwd: repoPath });
+      await exec('git config user.email "ai-hub-corporativo-bot@example.com"', { cwd: repoPath });
       await exec('git config user.name "AI Hub Bot"', { cwd: repoPath });
       await exec(`git checkout -B ${branchName}`, { cwd: repoPath });
       await exec('git add -A', { cwd: repoPath });
