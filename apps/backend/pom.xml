@@ -14,8 +14,8 @@
     <groupId>com.aihub</groupId>
     <artifactId>hub</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>ai-hub-backend</name>
-    <description>AI Hub Backend</description>
+    <name>ai-hub-corporativo-backend</name>
+    <description>AI Hub Corporativo Backend</description>
 
     <properties>
         <java.version>21</java.version>

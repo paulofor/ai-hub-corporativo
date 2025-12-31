@@ -6,7 +6,7 @@ Esta referência resume decisões práticas para criar uma GitHub App compatíve
 
 - **Sugestões de nome**: `AI Hub Automations`, `Codex Workflow Bridge`, `AI Hub DevOps Bot`, `Codex Actions Orchestrator`.
 - **Slug automático**: o GitHub gera um slug com base no nome; ele pode ser usado em `GITHUB_ORG_DEFAULT` se desejar que o script pré-selecione uma organização.
-- **Homepage URL**: use uma página institucional do seu time (por exemplo, o domínio público onde o AI Hub será hospedado) ou, caso ainda não exista, informe temporariamente a URL do repositório (`https://github.com/<sua-conta>/ai-hub`). O campo pode ser editado depois sem impacto técnico.
+- **Homepage URL**: use uma página institucional do seu time (por exemplo, o domínio público onde o AI Hub será hospedado) ou, caso ainda não exista, informe temporariamente a URL do repositório (`https://github.com/<sua-conta>/ai-hub-corporativo`). O campo pode ser editado depois sem impacto técnico.
 
 ## Permissões recomendadas
 
@@ -34,7 +34,7 @@ Se a sua instalação também precisa interagir com repositórios privados, marq
 > 💡 **Onde encontrar os dados na interface do GitHub**
 >
 > 1. Faça login no GitHub, clique na sua foto (canto superior direito) e acesse **Settings → Developer settings → GitHub Apps**.
-> 2. Selecione a app recém-criada (ex.: `ai-hub-automations`). Na aba **General** você verá um banner semelhante a “Registration successful! You must generate a private key in order to install your GitHub App.” — use o botão **Generate a private key** ali mesmo para baixar o `.pem`.
+> 2. Selecione a app recém-criada (ex.: `ai-hub-corporativo-automations`). Na aba **General** você verá um banner semelhante a “Registration successful! You must generate a private key in order to install your GitHub App.” — use o botão **Generate a private key** ali mesmo para baixar o `.pem`.
 > 3. A seção **About** mostra os campos **App ID** (número, ex.: `212632`) e **Client ID** (ex.: `Iv1.xxxxxxxxxxxxx`). Copie o App ID para `GITHUB_APP_ID`; o Client ID não é usado pelo script, mas é útil para integrações OAuth caso venha a precisar.
 > 4. Logo abaixo, em **Webhook**, crie (ou revele) o segredo clicando em **Edit**, copie o valor para `GITHUB_WEBHOOK_SECRET` e salve.
 > 5. Na coluna lateral esquerda, entre em **Install App**, abra a instalação correspondente à sua conta/organização e copie o número final da URL (`/installations/<id>`) para `GITHUB_INSTALLATION_ID`.
