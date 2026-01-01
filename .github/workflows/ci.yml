@@ -145,6 +145,9 @@ jobs:
       - name: Ensure public network exists on VPS
         run: |
           ssh ${SSH_COMMON_ARGS} "${DEPLOY_USER}@${DEPLOY_HOST}" "docker network inspect public-net >/dev/null 2>&1 || docker network create public-net"
+      - name: Ensure environment file exists on VPS
+        run: |
+          ssh ${SSH_COMMON_ARGS} "${DEPLOY_USER}@${DEPLOY_HOST}" "cd ${REMOTE_PATH} && if [ ! -f .env ]; then cp .env.example .env; fi"
       - name: Publish services
         run: |
           REMOTE_IMAGES_ENV="BACKEND_IMAGE=ghcr.io/${GHCR_USERNAME}/ai-hub-corporativo-backend:latest FRONTEND_IMAGE=ghcr.io/${GHCR_USERNAME}/ai-hub-corporativo-frontend:latest SANDBOX_ORCHESTRATOR_IMAGE=ghcr.io/${GHCR_USERNAME}/ai-hub-corporativo-sandbox:latest"
