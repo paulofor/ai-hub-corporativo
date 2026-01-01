@@ -112,7 +112,7 @@ jobs:
     env:
       DEPLOY_HOST: 64.23.136.252
       DEPLOY_USER: root
-      REMOTE_PATH: /root/ai-hub
+      REMOTE_PATH: /root/ai-hub-corporativo
       GHCR_USERNAME: ${{ secrets.GHCR_USERNAME != '' && secrets.GHCR_USERNAME || github.actor }}
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN != '' && secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
     steps:
