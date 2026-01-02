@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
+import AdmZip from 'adm-zip';
 import path from 'node:path';
 import request from 'supertest';
 
@@ -71,6 +72,25 @@ test('returns existing job idempotently', async () => {
 test('rejects invalid payload', async () => {
   const app = createApp({ processor: new StubProcessor() });
   await request(app).post('/jobs').send({}).expect(400);
+});
+
+test('accepts upload job without repo url', async () => {
+  const registry = new Map<string, SandboxJob>();
+  const app = createApp({ jobRegistry: registry, processor: new StubProcessor() });
+  const zip = new AdmZip();
+  zip.addFile('README.md', Buffer.from('hello upload'));
+  const payload = {
+    jobId: 'job-upload-1',
+    taskDescription: 'analyze upload',
+    uploadedZip: { base64: zip.toBuffer().toString('base64'), filename: 'source.zip' },
+  };
+
+  const creation = await request(app).post('/jobs').send(payload).expect(201);
+  assert.equal(creation.body.branch, 'upload');
+
+  const stored = registry.get(payload.jobId);
+  assert.ok(stored?.uploadedZip?.base64);
+  assert.equal(stored?.repoUrl, `upload://${payload.jobId}`);
 });
 
 test('respects SANDBOX_WORKDIR when creating workspaces', async () => {
@@ -1169,4 +1189,44 @@ test('reuses repository credentials from repoUrl when creating a pull request', 
 
   await fs.rm(bareRepo, { recursive: true, force: true });
   await fs.rm(seedRepo, { recursive: true, force: true });
+});
+
+
+test('processes uploaded zip without cloning git', async () => {
+  const zip = new AdmZip();
+  zip.addFile('README.md', Buffer.from('initial content'));
+
+  const fakeOpenAI = {
+    responses: {
+      create: async () => ({
+        output: [
+          {
+            type: 'message',
+            id: 'msg-upload',
+            role: 'assistant',
+            status: 'completed',
+            content: [{ type: 'output_text', text: 'done', annotations: [] }],
+          },
+        ],
+      }),
+    },
+  } as any;
+
+  const processor = new SandboxJobProcessor(undefined, 'gpt-5-codex', fakeOpenAI);
+  const job: SandboxJob = {
+    jobId: 'job-upload-process',
+    repoUrl: 'upload://job-upload-process',
+    branch: 'upload',
+    taskDescription: 'noop',
+    status: 'PENDING',
+    logs: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    uploadedZip: { base64: zip.toBuffer().toString('base64'), filename: 'code.zip' },
+  } as SandboxJob;
+
+  await processor.process(job);
+
+  assert.equal(job.status, 'COMPLETED');
+  assert.ok(job.logs.some((entry) => entry.includes('upload')));
 });

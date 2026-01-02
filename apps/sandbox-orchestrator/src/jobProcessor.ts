@@ -4,6 +4,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import AdmZip from 'adm-zip';
 import OpenAI from 'openai';
 import {
   ResponseFunctionToolCallItem,
@@ -117,20 +118,29 @@ export class SandboxJobProcessor implements JobProcessor {
     }
 
     try {
-      const githubAuth = this.resolveGithubAuth(job);
-      if (githubAuth.token) {
-        this.log(
-          job,
-          `token GitHub obtido de ${githubAuth.source} será usado para clone, push e criação de PR`,
-        );
+      const isUpload = this.isUploadJob(job);
+      let baseCommit: string | undefined;
+      let githubAuth: { token?: string; username: string; source: string } | undefined;
+
+      if (isUpload) {
+        baseCommit = await this.prepareUploadedRepository(job, repoPath);
       } else {
-        this.log(job, 'nenhum token GitHub configurado; operações autenticadas podem falhar');
+        githubAuth = this.resolveGithubAuth(job);
+        if (githubAuth.token) {
+          this.log(
+            job,
+            `token GitHub obtido de ${githubAuth.source} será usado para clone, push e criação de PR`,
+          );
+        } else {
+          this.log(job, 'nenhum token GitHub configurado; operações autenticadas podem falhar');
+        }
+
+        const cloneUrl = buildAuthRepoUrl(job.repoUrl, githubAuth.token, githubAuth.username);
+        this.log(job, `clonando repositório ${redactUrlCredentials(cloneUrl)} (branch ${job.branch})`);
+        await this.cloneRepository(job, repoPath, cloneUrl);
+        baseCommit = await this.getHeadCommit(repoPath);
       }
 
-      const cloneUrl = buildAuthRepoUrl(job.repoUrl, githubAuth.token, githubAuth.username);
-      this.log(job, `clonando repositório ${redactUrlCredentials(cloneUrl)} (branch ${job.branch})`);
-      await this.cloneRepository(job, repoPath, cloneUrl);
-      const baseCommit = await this.getHeadCommit(repoPath);
       if (!this.openai) {
         throw new Error('OPENAI_API_KEY não configurada no sandbox orchestrator');
       }
@@ -140,7 +150,13 @@ export class SandboxJobProcessor implements JobProcessor {
       job.summary = summary;
       job.changedFiles = await this.collectChangedFiles(repoPath, baseCommit);
       job.patch = await this.generatePatch(repoPath, baseCommit);
-      await this.maybeCreatePullRequest(job, repoPath, githubAuth, baseCommit, job.patch);
+
+      if (isUpload) {
+        this.log(job, 'job criado via upload; PR automático será ignorado');
+      } else if (githubAuth) {
+        await this.maybeCreatePullRequest(job, repoPath, githubAuth, baseCommit, job.patch);
+      }
+
       this.log(job, 'job concluído com sucesso, coletando patch e arquivos alterados');
       job.status = 'COMPLETED';
     } catch (error) {
@@ -207,6 +223,89 @@ export class SandboxJobProcessor implements JobProcessor {
     if (job.commitHash) {
       this.log(job, `checando commit ${job.commitHash}`);
       await exec(`git checkout ${job.commitHash}`, { cwd: repoPath });
+    }
+  }
+
+  private isUploadJob(job: SandboxJob): boolean {
+    return Boolean(job.uploadedZip?.base64);
+  }
+
+  private async prepareUploadedRepository(job: SandboxJob, repoPath: string): Promise<string | undefined> {
+    const upload = job.uploadedZip;
+    if (!upload?.base64) {
+      throw new Error('conteúdo do zip ausente no job');
+    }
+
+    let buffer: Buffer;
+    try {
+      buffer = Buffer.from(upload.base64, 'base64');
+    } catch {
+      throw new Error('conteúdo do zip inválido (base64)');
+    }
+
+    this.log(
+      job,
+      `extraindo upload ${upload.filename ?? 'fonte.zip'} (${buffer.byteLength} bytes) para ${repoPath}`,
+    );
+
+    await fs.mkdir(repoPath, { recursive: true });
+    await this.extractUploadedZip(job, buffer, repoPath);
+    return this.initializeGitFromUpload(job, repoPath);
+  }
+
+  private async extractUploadedZip(job: SandboxJob, buffer: Buffer, targetDir: string): Promise<void> {
+    let zip: AdmZip;
+    try {
+      zip = new AdmZip(buffer);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`falha ao ler zip enviado: ${message}`);
+    }
+
+    const destination = path.resolve(targetDir);
+    const entries = zip.getEntries();
+    for (const entry of entries) {
+      const normalized = path.normalize(entry.entryName).replace(/^\/+/, '');
+      if (!normalized || normalized.startsWith('..')) {
+        throw new Error(`entrada de zip inválida: ${entry.entryName}`);
+      }
+
+      const fullPath = path.resolve(path.join(destination, normalized));
+      if (!fullPath.startsWith(destination)) {
+        throw new Error(`entrada de zip aponta para fora do diretório de trabalho: ${entry.entryName}`);
+      }
+
+      if (entry.isDirectory) {
+        await fs.mkdir(fullPath, { recursive: true });
+        continue;
+      }
+
+      await fs.mkdir(path.dirname(fullPath), { recursive: true });
+      await fs.writeFile(fullPath, entry.getData());
+    }
+    this.log(job, `upload extraído (${entries.length} entradas)`);
+  }
+
+  private async initializeGitFromUpload(job: SandboxJob, repoPath: string): Promise<string | undefined> {
+    try {
+      await exec('git init', { cwd: repoPath });
+      await exec('git config user.email "ai-hub-upload@example.com"', { cwd: repoPath });
+      await exec('git config user.name "AI Hub Upload"', { cwd: repoPath });
+      const branch = job.branch ?? 'upload';
+      await exec(`git checkout -B ${branch}`, { cwd: repoPath });
+      await exec('git add -A', { cwd: repoPath });
+      try {
+        await exec('git commit -m "Initial upload"', { cwd: repoPath });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.log(job, `nenhum commit inicial criado: ${message}`);
+      }
+
+      return await this.getHeadCommit(repoPath);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(job, `falha ao inicializar git para upload: ${message}`);
+      return undefined;
     }
   }
 
@@ -791,19 +890,28 @@ Modo econômico ativo: minimize leituras extensas, priorize comandos curtos, esc
     if (!(await this.isGitRepository(repoPath))) {
       return [];
     }
-    const { stdout } = await exec(`git diff --name-only ${baseCommit ?? 'HEAD'}`, { cwd: repoPath });
-    return stdout
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
+
+    try {
+      const { stdout } = await exec(`git diff --name-only ${baseCommit ?? 'HEAD'}`, { cwd: repoPath });
+      return stdout
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+    } catch {
+      return [];
+    }
   }
 
   private async generatePatch(repoPath: string, baseCommit?: string): Promise<string> {
     if (!(await this.isGitRepository(repoPath))) {
       return '';
     }
-    const { stdout } = await exec(`git diff ${baseCommit ?? 'HEAD'}`, { cwd: repoPath });
-    return stdout;
+    try {
+      const { stdout } = await exec(`git diff ${baseCommit ?? 'HEAD'}`, { cwd: repoPath });
+      return stdout;
+    } catch {
+      return '';
+    }
   }
 
   private async isGitRepository(repoPath: string): Promise<boolean> {

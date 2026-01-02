@@ -9,6 +9,7 @@ import ShellLayout from './components/ShellLayout';
 import CodexPage from './pages/CodexPage';
 import CodexModelsPage from './pages/CodexModelsPage';
 import EnvironmentsPage from './pages/EnvironmentsPage';
+import UploadJobPage from './pages/UploadJobPage';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
         <Route path="/environments" element={<EnvironmentsPage />} />
         <Route path="/codex" element={<CodexPage />} />
         <Route path="/codex/models" element={<CodexModelsPage />} />
+        <Route path="/upload-jobs" element={<UploadJobPage />} />
         <Route path="/audit" element={<AuditLogPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
