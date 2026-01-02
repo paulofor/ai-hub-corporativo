@@ -22,7 +22,7 @@ export default function ProjectsPage() {
         <div>
           <h2 className="text-2xl font-semibold">Projetos</h2>
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            Catálogo de sistemas criados via AI Hub. Acesse repositórios e workflows rapidamente.
+            Catálogo de sistemas criados via AI Hub Corp. Acesse repositórios e workflows rapidamente.
           </p>
         </div>
         <Link

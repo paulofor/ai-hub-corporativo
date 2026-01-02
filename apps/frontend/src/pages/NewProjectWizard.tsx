@@ -152,7 +152,7 @@ export default function NewProjectWizard() {
               </div>
             </dl>
             <p className="text-xs text-slate-500">
-              Ao confirmar, o AI Hub criará o repositório na organização informada, configurará o webhook e registrará a ação no audit log.
+              Ao confirmar, o AI Hub Corp criará o repositório na organização informada, configurará o webhook e registrará a ação no audit log.
             </p>
             <ConfirmButton
               onConfirm={createProject}
