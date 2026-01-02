@@ -1,28 +1,17 @@
 import { useState } from 'react';
-import { useFetch } from '../hooks/useFetch';
 import client from '../api/client';
 import ConfirmButton from '../components/ConfirmButton';
 import { useToasts } from '../components/ToastContext';
 import { useNavigate } from 'react-router-dom';
-
-interface Blueprint {
-  id: number;
-  name: string;
-  description: string;
-}
 
 const ownerHeaders = { 'X-Role': 'owner', 'X-User': 'ui-owner' };
 
 export default function NewProjectWizard() {
   const navigate = useNavigate();
   const { pushToast } = useToasts();
-  const { data: blueprints, loading } = useFetch<Blueprint[]>(
-    () => client.get('/blueprints').then((res) => res.data),
-    []
-  );
   const [step, setStep] = useState(1);
+  const totalSteps = 3;
   const [form, setForm] = useState({
-    blueprint: '',
     org: '',
     name: '',
     isPrivate: true,
@@ -31,13 +20,12 @@ export default function NewProjectWizard() {
     templateRepo: ''
   });
 
-  const next = () => setStep((s) => Math.min(4, s + 1));
+  const next = () => setStep((s) => Math.min(totalSteps, s + 1));
   const prev = () => setStep((s) => Math.max(1, s - 1));
 
   const canAdvance = () => {
-    if (step === 1) return form.blueprint !== '';
-    if (step === 2) return form.org !== '' && form.name !== '';
-    if (step === 3) {
+    if (step === 1) return form.org !== '' && form.name !== '';
+    if (step === 2) {
       if (!form.useTemplate) return true;
       return form.templateOwner !== '' && form.templateRepo !== '';
     }
@@ -48,7 +36,6 @@ export default function NewProjectWizard() {
     const payload = {
       org: form.org,
       name: form.name,
-      blueprint: form.blueprint,
       isPrivate: form.isPrivate,
       useTemplate: form.useTemplate,
       templateOwner: form.useTemplate ? form.templateOwner : undefined,
@@ -66,49 +53,16 @@ export default function NewProjectWizard() {
         <div>
           <h2 className="text-2xl font-semibold">Novo projeto</h2>
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            Siga as etapas para provisionar um repositório GitHub com base em um blueprint.
+            Siga as etapas para provisionar um repositório GitHub vazio ou a partir de um template existente.
           </p>
         </div>
-        <p className="text-sm font-semibold text-slate-500">Passo {step} de 4</p>
+        <p className="text-sm font-semibold text-slate-500">Passo {step} de {totalSteps}</p>
       </div>
 
       <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 p-6 space-y-6">
         {step === 1 && (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">1. Escolha o blueprint</h3>
-            {loading && <p className="text-sm text-slate-500">Carregando...</p>}
-            <div className="space-y-3">
-              {blueprints?.map((blueprint) => (
-                <label
-                  key={blueprint.id}
-                  className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${
-                    form.blueprint === blueprint.name
-                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/40'
-                      : 'border-slate-200 dark:border-slate-700'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="blueprint"
-                    value={blueprint.name}
-                    checked={form.blueprint === blueprint.name}
-                    onChange={() => setForm((prev) => ({ ...prev, blueprint: blueprint.name }))}
-                    className="mt-1"
-                  />
-                  <div>
-                    <p className="font-semibold">{blueprint.name}</p>
-                    <p className="text-sm text-slate-600 dark:text-slate-300">{blueprint.description}</p>
-                  </div>
-                </label>
-              ))}
-              {blueprints && blueprints.length === 0 && <p className="text-sm text-slate-500">Nenhum blueprint cadastrado.</p>}
-            </div>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">2. Informe organização e nome do repositório</h3>
+            <h3 className="text-lg font-semibold">1. Organização e nome do repositório</h3>
             <div>
               <label className="block text-sm font-medium">Organização</label>
               <input
@@ -130,9 +84,9 @@ export default function NewProjectWizard() {
           </div>
         )}
 
-        {step === 3 && (
+        {step === 2 && (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">3. Opções</h3>
+            <h3 className="text-lg font-semibold">2. Opções</h3>
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -145,9 +99,7 @@ export default function NewProjectWizard() {
               <input
                 type="checkbox"
                 checked={form.useTemplate}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, useTemplate: event.target.checked }))
-                }
+                onChange={(event) => setForm((prev) => ({ ...prev, useTemplate: event.target.checked }))}
               />
               <span>Usar repositório template existente</span>
             </label>
@@ -174,14 +126,10 @@ export default function NewProjectWizard() {
           </div>
         )}
 
-        {step === 4 && (
+        {step === 3 && (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">4. Revisão</h3>
+            <h3 className="text-lg font-semibold">3. Revisão</h3>
             <dl className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
-              <div>
-                <dt className="font-medium text-slate-500">Blueprint</dt>
-                <dd className="font-semibold">{form.blueprint}</dd>
-              </div>
               <div>
                 <dt className="font-medium text-slate-500">Organização</dt>
                 <dd className="font-semibold">{form.org}</dd>
@@ -199,13 +147,12 @@ export default function NewProjectWizard() {
                 <dd className="font-semibold">
                   {form.useTemplate
                     ? `${form.templateOwner}/${form.templateRepo}`
-                    : 'Criar repo vazio e subir arquivos do blueprint'}
+                    : 'Criar repositório vazio'}
                 </dd>
               </div>
             </dl>
             <p className="text-xs text-slate-500">
-              Ao confirmar, o AI Hub criará o repositório na organização informada, publicará os arquivos do blueprint e
-              registrará a ação no audit log.
+              Ao confirmar, o AI Hub criará o repositório na organização informada, configurará o webhook e registrará a ação no audit log.
             </p>
             <ConfirmButton
               onConfirm={createProject}
@@ -225,7 +172,7 @@ export default function NewProjectWizard() {
           >
             Voltar
           </button>
-          {step < 4 && (
+          {step < totalSteps && (
             <button
               type="button"
               onClick={next}

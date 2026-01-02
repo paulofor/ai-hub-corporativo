@@ -29,14 +29,14 @@ export default function DashboardPage() {
     <section className="space-y-6">
       <h2 className="text-2xl font-semibold">Visão geral</h2>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <DashboardCard title="Criar Sistema" description="Inicie um novo projeto a partir de um blueprint">
+        <DashboardCard title="Criar Sistema" description="Provisiona um novo repositório GitHub com o wizard">
           <Link to="/projects/new" className="text-sm font-semibold text-emerald-600">
             Abrir wizard →
           </Link>
         </DashboardCard>
-        <DashboardCard title="Blueprints" description="Gerencie templates para stacks completas">
-          <Link to="/blueprints" className="text-sm font-semibold text-emerald-600">
-            Ver blueprints →
+        <DashboardCard title="Ambientes" description="Gerencie tokens e segredos usados nos agentes">
+          <Link to="/environments" className="text-sm font-semibold text-emerald-600">
+            Configurar →
           </Link>
         </DashboardCard>
         <DashboardCard

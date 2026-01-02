@@ -8,7 +8,6 @@ import { useToasts } from '../components/ToastContext';
 interface Project {
   repo: string;
   repoUrl: string;
-  blueprint?: { name: string };
 }
 
 interface RunRecord {
@@ -147,7 +146,6 @@ export default function ProjectDetailPage() {
         <div>
           <h2 className="text-2xl font-semibold">{owner}/{repo}</h2>
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            Blueprint: {project?.blueprint?.name ?? '—'} ·{' '}
             <a href={project?.repoUrl} target="_blank" rel="noreferrer" className="text-emerald-600">
               Abrir no GitHub
             </a>
