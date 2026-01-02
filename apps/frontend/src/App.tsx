@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import DashboardPage from './pages/DashboardPage';
-import BlueprintsPage from './pages/BlueprintsPage';
 import ProjectsPage from './pages/ProjectsPage';
 import NewProjectWizard from './pages/NewProjectWizard';
 import ProjectDetailPage from './pages/ProjectDetailPage';
@@ -17,7 +16,6 @@ function App() {
     <ShellLayout>
       <Routes>
         <Route path="/" element={<DashboardPage />} />
-        <Route path="/blueprints" element={<BlueprintsPage />} />
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/new" element={<NewProjectWizard />} />
         <Route path="/projects/:owner/:repo" element={<ProjectDetailPage />} />
