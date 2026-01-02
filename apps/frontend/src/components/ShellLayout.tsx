@@ -9,6 +9,7 @@ const links = [
   { to: '/environments', label: 'Ambientes' },
   { to: '/codex', label: 'Codex' },
   { to: '/codex/models', label: 'Modelos Codex' },
+  { to: '/upload-jobs', label: 'Upload ZIP' },
   { to: '/audit', label: 'Audit Log' }
 ];
 

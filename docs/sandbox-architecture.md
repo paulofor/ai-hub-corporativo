@@ -36,3 +36,10 @@ O fluxo de automação agora centraliza a execução das correções no `sandbox
 ## Ferramentas disponíveis no sandbox
 
 - O contêiner do sandbox agora inclui o utilitário `apply_patch` (wrapper para `patch`/`gpatch`) em `/usr/local/bin`. Ele aceita patches com o marcador `*** Begin Patch` ou diffs tradicionais, permitindo edições segmentadas sem reescrever arquivos completos.
+
+## Upload de fontes via ZIP
+
+- Além do fluxo GitHub tradicional, a UI agora expõe uma página de upload que aceita um pacote `.zip` com o código-fonte.
+- O frontend envia o arquivo para o backend em `POST /api/upload-jobs` (multipart), que converte o conteúdo em base64 e encaminha para o `sandbox-orchestrator` usando o campo `uploadedZip`.
+- O orquestrador extrai o zip, inicializa um repositório git local (branch `upload`), executa o loop do modelo e retorna `summary`, `changedFiles` e `patch` como nos jobs clonados.
+- Jobs de upload não criam pull requests e usam `repoUrl` sintético (`upload://{jobId}`) apenas para rastreamento interno.

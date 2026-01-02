@@ -54,6 +54,32 @@ public class SandboxOrchestratorClient {
         return SandboxOrchestratorJobResponse.from(response);
     }
 
+    public SandboxOrchestratorJobResponse createUploadJob(SandboxUploadJobRequest request) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("jobId", request.jobId());
+        body.put("taskDescription", request.taskDescription());
+        body.put("branch", Optional.ofNullable(request.branch()).orElse("upload"));
+        body.put("repoUrl", Optional.ofNullable(request.repoUrl()).orElse("upload://" + request.jobId()));
+        Optional.ofNullable(request.testCommand()).ifPresent(value -> body.put("testCommand", value));
+        Optional.ofNullable(request.profile()).ifPresent(value -> body.put("profile", value));
+        Optional.ofNullable(request.model()).ifPresent(value -> body.put("model", value));
+
+        Map<String, Object> upload = new HashMap<>();
+        upload.put("base64", request.base64Zip());
+        Optional.ofNullable(request.zipName()).ifPresent(value -> upload.put("filename", value));
+        body.put("uploadedZip", upload);
+
+        log.info("Enviando job {} (upload) para sandbox-orchestrator no path {}", request.jobId(), jobsPath);
+        JsonNode response = restClient.post()
+            .uri(jobsPath)
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(body)
+            .retrieve()
+            .body(JsonNode.class);
+
+        return SandboxOrchestratorJobResponse.from(response);
+    }
+
     public SandboxOrchestratorJobResponse getJob(String jobId) {
         log.info("Consultando job {} no sandbox-orchestrator", jobId);
         try {

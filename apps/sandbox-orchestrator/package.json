@@ -10,6 +10,7 @@
     "test": "npm run build --silent && node --test dist/tests/jobs.test.js"
   },
   "dependencies": {
+    "adm-zip": "^0.5.16",
     "express": "^4.19.2",
     "morgan": "^1.10.0",
     "openai": "^4.58.0"
@@ -21,6 +22,7 @@
     "@types/supertest": "^2.0.16",
     "supertest": "^7.1.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "@types/adm-zip": "^0.5.7"
   }
 }

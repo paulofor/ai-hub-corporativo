@@ -1,6 +1,11 @@
 export type JobStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
 export type SandboxProfile = 'STANDARD' | 'ECONOMY';
 
+export interface UploadedZip {
+  base64: string;
+  filename?: string;
+}
+
 export interface SandboxJob {
   jobId: string;
   repoSlug?: string;
@@ -11,6 +16,7 @@ export interface SandboxJob {
   commitHash?: string;
   profile?: SandboxProfile;
   model?: string;
+  uploadedZip?: UploadedZip;
   status: JobStatus;
   summary?: string;
   changedFiles?: string[];

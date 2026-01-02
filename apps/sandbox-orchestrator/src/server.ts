@@ -71,9 +71,26 @@ export function createApp(options: AppOptions = {}) {
     const testCommand = validateString(req.body?.testCommand);
     const model = validateString(req.body?.model);
     const profile = normalizeProfile(validateString(req.body?.profile));
+    const uploadedZipBase64 =
+      validateString(req.body?.uploadedZip?.base64) ??
+      validateString(req.body?.sourceZipBase64) ??
+      validateString(req.body?.zipBase64);
+    const uploadedZipName =
+      validateString(req.body?.uploadedZip?.filename) ??
+      validateString(req.body?.sourceZipName) ??
+      validateString(req.body?.zipName);
 
-    if (!jobId || (!repoUrl && !repoSlug) || !branch || !taskDescription) {
-      return res.status(400).json({ error: 'jobId, repoSlug/repoUrl, branch e taskDescription são obrigatórios' });
+    const isUpload = Boolean(uploadedZipBase64);
+    const resolvedBranch = branch ?? (isUpload ? 'upload' : undefined);
+
+    if (!jobId || !taskDescription || (!isUpload && ((!repoUrl && !repoSlug) || !resolvedBranch))) {
+      return res
+        .status(400)
+        .json({ error: 'jobId, taskDescription e (repoSlug/repoUrl + branch ou uploadedZip) são obrigatórios' });
+    }
+
+    if (!resolvedBranch) {
+      return res.status(400).json({ error: 'branch é obrigatória quando não há zip enviado' });
     }
 
     const existing = jobRegistry.get(jobId);
@@ -82,22 +99,24 @@ export function createApp(options: AppOptions = {}) {
       return res.json(existing);
     }
 
+    const sourceLabel = isUpload ? `upload ${uploadedZipName ?? 'fonte.zip'}` : repoSlug ?? repoUrl;
     const modelLabel = model ? `, modelo ${model}` : '';
     console.log(
-      `Sandbox orchestrator: registrando job ${jobId} para repo ${repoSlug ?? repoUrl} na branch ${branch} (perfil ${profile}${modelLabel})`,
+      `Sandbox orchestrator: registrando job ${jobId} para ${sourceLabel} na branch ${resolvedBranch} (perfil ${profile}${modelLabel})`,
     );
 
     const now = new Date().toISOString();
     const job: SandboxJob = {
       jobId,
       repoSlug: repoSlug,
-      repoUrl: repoUrl ?? `https://github.com/${repoSlug}.git`,
-      branch,
+      repoUrl: repoUrl ?? (repoSlug ? `https://github.com/${repoSlug}.git` : `upload://${jobId}`),
+      branch: resolvedBranch,
       taskDescription,
       commitHash,
       testCommand,
       profile,
       model: model ?? undefined,
+      uploadedZip: isUpload ? { base64: uploadedZipBase64!, filename: uploadedZipName ?? undefined } : undefined,
       status: 'PENDING',
       logs: [],
       createdAt: now,
