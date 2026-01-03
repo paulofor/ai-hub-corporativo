@@ -69,6 +69,23 @@ public class SandboxOrchestratorClient {
         Optional.ofNullable(request.zipName()).ifPresent(value -> upload.put("filename", value));
         body.put("uploadedZip", upload);
 
+        if (request.problemFiles() != null && !request.problemFiles().isEmpty()) {
+            List<Map<String, Object>> problemFiles = new java.util.ArrayList<>();
+            for (var file : request.problemFiles()) {
+                if (file == null) {
+                    continue;
+                }
+                Map<String, Object> attachment = new HashMap<>();
+                attachment.put("base64", file.base64());
+                attachment.put("filename", file.filename());
+                Optional.ofNullable(file.contentType()).ifPresent(value -> attachment.put("contentType", value));
+                problemFiles.add(attachment);
+            }
+            if (!problemFiles.isEmpty()) {
+                body.put("problemFiles", problemFiles);
+            }
+        }
+
         log.info("Enviando job {} (upload) para sandbox-orchestrator no path {}", request.jobId(), jobsPath);
         JsonNode response = restClient.post()
             .uri(jobsPath)

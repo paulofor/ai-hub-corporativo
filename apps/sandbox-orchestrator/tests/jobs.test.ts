@@ -75,6 +75,26 @@ test('rejects invalid payload', async () => {
 });
 
 test('accepts upload job without repo url', async () => {
+test('accepts upload job with problem files', async () => {
+  const registry = new Map<string, SandboxJob>();
+  const app = createApp({ jobRegistry: registry, processor: new StubProcessor() });
+  const zip = new AdmZip();
+  zip.addFile('README.md', Buffer.from('hello upload attachments'));
+  const payload = {
+    jobId: 'job-upload-problem-files',
+    taskDescription: 'investigar erro',
+    uploadedZip: { base64: zip.toBuffer().toString('base64'), filename: 'source.zip' },
+    problemFiles: [{ base64: Buffer.from('Linha 1;erro').toString('base64'), filename: 'erros.csv' }],
+  };
+
+  await request(app).post('/jobs').send(payload).expect(201);
+
+  const stored = registry.get(payload.jobId);
+  assert.ok(stored?.problemFiles);
+  assert.equal(stored?.problemFiles?.length, 1);
+  assert.equal(stored?.problemFiles?.[0].filename, 'erros.csv');
+});
+
   const registry = new Map<string, SandboxJob>();
   const app = createApp({ jobRegistry: registry, processor: new StubProcessor() });
   const zip = new AdmZip();
@@ -234,6 +254,68 @@ test('returns job status', async () => {
 
   const response = await request(app).get('/jobs/job-1').expect(200);
   assert.equal(response.body.jobId, 'job-1');
+});
+
+test('makes problem files available to the model inside the sandbox', async () => {
+  const tempRepo = await fs.mkdtemp(path.join(os.tmpdir(), 'sandbox-problem-files-'));
+  execSync('git init', { cwd: tempRepo });
+  execSync('git config user.email "ci@example.com"', { cwd: tempRepo });
+  execSync('git config user.name "CI Bot"', { cwd: tempRepo });
+  await fs.writeFile(path.join(tempRepo, 'README.md'), 'initial');
+  execSync('git add README.md', { cwd: tempRepo });
+  execSync('git commit -m "init"', { cwd: tempRepo });
+  execSync('git branch -M main', { cwd: tempRepo });
+
+  const fakeOpenAI = {
+    calls: [] as any[],
+    responses: {
+      create: async (payload: any) => {
+        fakeOpenAI.calls.push(payload);
+        return {
+          output: [
+            {
+              type: 'message',
+              id: 'msg-problem-files',
+              role: 'assistant',
+              status: 'completed',
+              content: [{ type: 'output_text', text: 'done', annotations: [] }],
+            },
+          ],
+        };
+      },
+    },
+  } as any;
+
+  const processor = new SandboxJobProcessor(undefined, 'gpt-5-codex', fakeOpenAI);
+  (processor as any).cleanup = async () => {};
+  const job: SandboxJob = {
+    jobId: 'job-problem-files',
+    repoUrl: tempRepo,
+    branch: 'main',
+    taskDescription: 'analisar arquivos de problema',
+    status: 'PENDING',
+    logs: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    problemFiles: [
+      { base64: Buffer.from('erro linha 1').toString('base64'), filename: 'erros.txt' },
+    ],
+  } as SandboxJob;
+
+  await processor.process(job);
+
+  const workspace = job.sandboxPath!;
+  const problemFilePath = path.join(workspace, 'repo', '.aihub', 'problem-files', 'erros.txt');
+  const content = await fs.readFile(problemFilePath, 'utf-8');
+  assert.equal(content, 'erro linha 1');
+
+  const systemMessage = fakeOpenAI.calls[0].input.find((item: any) => item.role === 'system');
+  const systemText = systemMessage?.content?.find((c: any) => c.type === 'input_text')?.text ?? '';
+  assert.ok(systemText.includes('.aihub/problem-files'), 'system message should mention problem files');
+  assert.ok(systemText.includes('erros.txt'));
+
+  await fs.rm(workspace, { recursive: true, force: true });
+  await fs.rm(tempRepo, { recursive: true, force: true });
 });
 
 test('processes tool calls inside a sandbox', async () => {

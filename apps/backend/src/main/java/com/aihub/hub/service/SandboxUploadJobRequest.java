@@ -1,5 +1,7 @@
 package com.aihub.hub.service;
 
+import java.util.List;
+
 public record SandboxUploadJobRequest(
     String jobId,
     String taskDescription,
@@ -9,6 +11,7 @@ public record SandboxUploadJobRequest(
     String profile,
     String model,
     String repoUrl,
-    String branch
+    String branch,
+    List<UploadedProblemFile> problemFiles
 ) {
 }
