@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { ChangeEvent, FormEvent, useState } from 'react';
 import client from '../api/client';
 import { useToasts } from '../components/ToastContext';
 
@@ -43,9 +43,15 @@ export default function UploadJobPage() {
   const [profile, setProfile] = useState<SandboxProfile>('STANDARD');
   const [model, setModel] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [problemFiles, setProblemFiles] = useState<File[]>([]);
   const [jobs, setJobs] = useState<UploadJob[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleProblemFilesChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const selection = event.target.files ? Array.from(event.target.files) : [];
+    setProblemFiles(selection);
+  };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -74,6 +80,9 @@ export default function UploadJobPage() {
       formData.append('model', model.trim());
     }
     formData.append('profile', profile);
+    problemFiles.forEach((problemFile) => {
+      formData.append('problemFiles', problemFile);
+    });
 
     try {
       const response = await client.post('/upload-jobs', formData, {
@@ -85,6 +94,7 @@ export default function UploadJobPage() {
       setTestCommand('');
       setFile(null);
       setModel('');
+      setProblemFiles([]);
       pushToast('Job criado e enviado para o sandbox.');
     } catch (err) {
       setError((err as Error).message);
@@ -105,7 +115,7 @@ export default function UploadJobPage() {
         <div>
           <h2 className="text-2xl font-semibold">Upload de fontes em ZIP</h2>
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            Envie um pacote ZIP com o código-fonte e descreva a tarefa que o sandbox deve executar.
+            Envie o projeto em ZIP, anexe arquivos (txt, csv etc.) descrevendo o problema e peça recomendações ao modelo.
           </p>
         </div>
       </div>
@@ -124,6 +134,41 @@ export default function UploadJobPage() {
               className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-emerald-100 file:px-3 file:py-2 file:text-emerald-700 hover:file:bg-emerald-200 dark:text-slate-200 dark:file:bg-emerald-900/40 dark:file:text-emerald-100"
             />
             {file && <p className="text-xs text-slate-500">Selecionado: {file.name}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Arquivos do problema (txt, csv, logs, etc.)</label>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Envie arquivos que descrevam o erro encontrado; eles ficarão disponíveis no sandbox junto com o código.
+            </p>
+            <input
+              type="file"
+              multiple
+              accept=".txt,.csv,.md,.log,.json,.yaml,.yml,.xml"
+              onChange={handleProblemFilesChange}
+              className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-emerald-100 file:px-3 file:py-2 file:text-emerald-700 hover:file:bg-emerald-200 dark:text-slate-200 dark:file:bg-emerald-900/40 dark:file:text-emerald-100"
+            />
+            {problemFiles.length > 0 && (
+              <ul className="space-y-2 text-xs text-slate-700 dark:text-slate-200">
+                {problemFiles.map((problemFile, index) => (
+                  <li
+                    key={`${problemFile.name}-${index}`}
+                    className="flex items-center justify-between rounded-md bg-slate-100 px-2 py-1 dark:bg-slate-800"
+                  >
+                    <span className="truncate pr-3" title={problemFile.name}>
+                      {problemFile.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setProblemFiles((current) => current.filter((_, idx) => idx !== index))}
+                      className="text-[11px] font-semibold text-emerald-700 hover:underline"
+                    >
+                      Remover
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className="space-y-2">

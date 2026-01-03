@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 public class CreateUploadJobRequest {
 
     @NotBlank
@@ -17,6 +19,8 @@ public class CreateUploadJobRequest {
     private String profile;
 
     private String model;
+
+    private List<MultipartFile> problemFiles;
 
     public String getTaskDescription() {
         return taskDescription;
@@ -56,5 +60,13 @@ public class CreateUploadJobRequest {
 
     public void setModel(String model) {
         this.model = model;
+    }
+
+    public List<MultipartFile> getProblemFiles() {
+        return problemFiles;
+    }
+
+    public void setProblemFiles(List<MultipartFile> problemFiles) {
+        this.problemFiles = problemFiles;
     }
 }

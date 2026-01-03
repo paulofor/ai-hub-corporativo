@@ -6,6 +6,12 @@ export interface UploadedZip {
   filename?: string;
 }
 
+export interface UploadedProblemFile {
+  base64: string;
+  filename: string;
+  contentType?: string;
+}
+
 export interface SandboxJob {
   jobId: string;
   repoSlug?: string;
@@ -17,6 +23,7 @@ export interface SandboxJob {
   profile?: SandboxProfile;
   model?: string;
   uploadedZip?: UploadedZip;
+  problemFiles?: UploadedProblemFile[];
   status: JobStatus;
   summary?: string;
   changedFiles?: string[];

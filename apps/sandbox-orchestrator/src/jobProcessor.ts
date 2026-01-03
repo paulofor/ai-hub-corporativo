@@ -141,6 +141,8 @@ export class SandboxJobProcessor implements JobProcessor {
         baseCommit = await this.getHeadCommit(repoPath);
       }
 
+      await this.materializeProblemFiles(job, repoPath);
+
       if (!this.openai) {
         throw new Error('OPENAI_API_KEY não configurada no sandbox orchestrator');
       }
@@ -309,6 +311,89 @@ export class SandboxJobProcessor implements JobProcessor {
     }
   }
 
+  private problemFilesDir(repoPath: string): string {
+    return path.join(repoPath, '.aihub', 'problem-files');
+  }
+
+  private sanitizeProblemFilename(name: string | undefined, index: number): string {
+    const fallback = `problema-${index + 1}.txt`;
+    if (!name) {
+      return fallback;
+    }
+    const normalized = path.basename(name.trim()).replace(/[\/:]/g, '_');
+    if (!normalized || normalized === '.' || normalized === '..') {
+      return fallback;
+    }
+    return normalized;
+  }
+
+  private async materializeProblemFiles(job: SandboxJob, repoPath: string): Promise<void> {
+    const files = job.problemFiles ?? [];
+    if (files.length === 0) {
+      return;
+    }
+
+    const targetDir = this.problemFilesDir(repoPath);
+    try {
+      await fs.mkdir(targetDir, { recursive: true });
+      await this.ensureProblemFilesIgnored(job, repoPath);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`não foi possível preparar diretório para arquivos do problema: ${message}`);
+    }
+
+    const saved: string[] = [];
+    for (const [index, file] of files.entries()) {
+      const filename = this.sanitizeProblemFilename(file.filename, index);
+      let buffer: Buffer;
+      try {
+        buffer = Buffer.from(file.base64, 'base64');
+      } catch {
+        throw new Error(`arquivo de problema ${filename} inválido (base64)`);
+      }
+
+      const destination = path.join(targetDir, filename);
+      await fs.writeFile(destination, buffer);
+      saved.push(filename);
+    }
+
+    const relative = path.relative(repoPath, targetDir) || '.';
+    this.log(job, `arquivos de apoio do problema disponíveis em ${relative}: ${saved.join(', ')}`);
+  }
+
+  private async ensureProblemFilesIgnored(job: SandboxJob, repoPath: string): Promise<void> {
+    const gitExclude = path.join(repoPath, '.git', 'info', 'exclude');
+    const marker = '.aihub/';
+    try {
+      await fs.mkdir(path.dirname(gitExclude), { recursive: true });
+      let existing = '';
+      try {
+        existing = await fs.readFile(gitExclude, 'utf-8');
+      } catch {
+        // noop: file will be created
+      }
+      if (!existing.includes(marker)) {
+        await fs.appendFile(gitExclude, `${marker}
+`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(job, `não foi possível registrar exclusão de arquivos do problema no git: ${message}`);
+    }
+  }
+
+  private describeProblemFiles(job: SandboxJob, repoPath: string): string {
+    const files = job.problemFiles ?? [];
+    if (files.length === 0) {
+      return '';
+    }
+
+    const dir = path.relative(repoPath, this.problemFilesDir(repoPath)) || '.';
+    const names = files.map((file) => file.filename).filter(Boolean);
+    const list = names.length > 0 ? ` (arquivos: ${names.join(', ')})` : '';
+    return `\nArquivos enviados pelo usuário descrevendo o problema estão disponíveis em ${dir}${list}. Leia-os antes de sugerir ajustes.`;
+  }
+
   private buildTools(repoPath: string) {
     return [
       {
@@ -385,6 +470,7 @@ export class SandboxJobProcessor implements JobProcessor {
       ? `
 Modo econômico ativo: minimize leituras extensas, priorize comandos curtos, escreva respostas objetivas e evite reexecuções desnecessárias.`
       : '';
+    const problemFilesInstruction = this.describeProblemFiles(job, repoPath);
     const messages: ResponseItem[] = [
       {
         type: 'message',
@@ -395,7 +481,7 @@ Modo econômico ativo: minimize leituras extensas, priorize comandos curtos, esc
             type: 'input_text',
             text: `Você está operando em um sandbox isolado em ${repoPath}. Use as tools para ler, alterar arquivos e executar comandos. Test command sugerido: ${
               job.testCommand ?? 'n/d'
-            }. Sempre trabalhe somente dentro do diretório do repositório. Prefira usar o comando rg para buscas recursivas em vez de grep -R, que é mais lento.${profileInstruction}`,
+            }. Sempre trabalhe somente dentro do diretório do repositório. Prefira usar o comando rg para buscas recursivas em vez de grep -R, que é mais lento.${profileInstruction}${problemFilesInstruction}`,
           },
         ],
       },

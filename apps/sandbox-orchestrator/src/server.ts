@@ -3,7 +3,7 @@ import morgan from 'morgan';
 import { spawnSync } from 'node:child_process';
 
 import { SandboxJobProcessor } from './jobProcessor.js';
-import { JobProcessor, SandboxJob, SandboxProfile } from './types.js';
+import { JobProcessor, SandboxJob, SandboxProfile, UploadedProblemFile } from './types.js';
 
 interface AppOptions {
   jobRegistry?: Map<string, SandboxJob>;
@@ -16,6 +16,26 @@ function validateString(value: unknown): string | undefined {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function parseProblemFiles(raw: unknown): UploadedProblemFile[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  const items = raw as Array<Record<string, unknown>>;
+  const files: UploadedProblemFile[] = [];
+  items.forEach((item, index) => {
+    const base64 = validateString(item?.base64);
+    if (!base64) {
+      return;
+    }
+    const filename = validateString(item?.filename) ?? `problema-${index + 1}.txt`;
+    const contentType = validateString(item?.contentType);
+    files.push({ base64, filename, contentType: contentType ?? undefined });
+  });
+
+  return files;
 }
 
 export function createApp(options: AppOptions = {}) {
@@ -80,6 +100,8 @@ export function createApp(options: AppOptions = {}) {
       validateString(req.body?.sourceZipName) ??
       validateString(req.body?.zipName);
 
+    const problemFiles = parseProblemFiles(req.body?.problemFiles);
+
     const isUpload = Boolean(uploadedZipBase64);
     const resolvedBranch = branch ?? (isUpload ? 'upload' : undefined);
 
@@ -117,6 +139,7 @@ export function createApp(options: AppOptions = {}) {
       profile,
       model: model ?? undefined,
       uploadedZip: isUpload ? { base64: uploadedZipBase64!, filename: uploadedZipName ?? undefined } : undefined,
+      problemFiles: problemFiles.length ? problemFiles : undefined,
       status: 'PENDING',
       logs: [],
       createdAt: now,
