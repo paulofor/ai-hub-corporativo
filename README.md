@@ -45,6 +45,8 @@ infra/
 
 ## Deploy em produção
 
+- Consulte `docs/https.md` para habilitar HTTPS no domínio iahubcorp.online via nginx + Let's Encrypt (frontend em https://iahubcorp.online e backend em https://iahubcorp.online/api).
+
 - As imagens publicadas na pipeline ficam disponíveis em `ghcr.io/<seu-usuário>/ai-hub-corporativo-backend`, `ghcr.io/<seu-usuário>/ai-hub-corporativo-frontend` e `ghcr.io/<seu-usuário>/ai-hub-corporativo-sandbox`.
 - Para que o deploy automático funcione, crie os secrets `GHCR_USERNAME` e `GHCR_TOKEN` (um PAT com escopo `read:packages`) no repositório — eles serão usados para executar `docker login` na VPS antes de `docker compose pull`.
 - Utilize o exemplo `infra/lightsail/containers.example.json` para provisionar o serviço no AWS Lightsail Container Service.

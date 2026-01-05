@@ -22,6 +22,7 @@ services:
       default:
         aliases:
           - backend
+
   frontend:
     image: ${FRONTEND_IMAGE:-ghcr.io/paulodb/ai-hub-corporativo-frontend:latest}
     build:
@@ -38,6 +39,37 @@ services:
       public-net:
         aliases:
           - aihub-frontend
+
+  reverse-proxy:
+    image: nginx:1.25-alpine
+    depends_on:
+      - frontend
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/frontend.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./infra/nginx/letsencrypt:/etc/letsencrypt:ro
+      - ./infra/nginx/certbot-www:/var/www/certbot:ro
+    networks:
+      default:
+      public-net:
+        aliases:
+          - iahubcorp.online
+
+  certbot:
+    image: certbot/certbot:v2.10.0
+    profiles:
+      - certbot
+    command: ["--version"]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/letsencrypt:/etc/letsencrypt
+      - ./infra/nginx/certbot-www:/var/www/certbot
+
   sandbox-orchestrator:
     image: ${SANDBOX_ORCHESTRATOR_IMAGE:-ghcr.io/paulodb/ai-hub-corporativo-sandbox:latest}
     build:
@@ -62,6 +94,7 @@ services:
       public-net:
         aliases:
           - sandbox-orchestrator
+
 networks:
   default:
   public-net:

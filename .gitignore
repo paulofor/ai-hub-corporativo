@@ -99,3 +99,8 @@ exemplo-cliente/codex/.direnv
 exemplo-cliente/codex/.envrc
 
 .env
+# Let's Encrypt assets
+infra/nginx/letsencrypt/*
+!infra/nginx/letsencrypt/.gitkeep
+infra/nginx/certbot-www/*
+!infra/nginx/certbot-www/.gitkeep

@@ -298,11 +298,11 @@ prompt_secret() {
 collect_env_values() {
   log_section "Coletando variáveis de ambiente"
 
-  prompt_with_default FRONTEND_HTTP_PORT "Porta externa para o frontend" "80"
+  prompt_with_default FRONTEND_HTTP_PORT "Porta externa para o frontend" "8082"
   prompt_with_default BACKEND_HTTP_PORT "Porta externa para o backend" "8081"
   prompt_with_default SANDBOX_ORCHESTRATOR_HTTP_PORT "Porta externa para o sandbox" "8083"
 
-  local default_public_url="http://localhost:${BACKEND_HTTP_PORT}"
+  local default_public_url="https://iahubcorp.online/api"
   prompt_with_default HUB_PUBLIC_URL "URL pública da API (ex: https://app.seudominio.com)" "${default_public_url}"
 
   prompt_with_default VITE_API_BASE_URL "Base da API usada pelo frontend" "/api"
