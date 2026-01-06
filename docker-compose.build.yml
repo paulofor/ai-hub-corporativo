@@ -1,0 +1,15 @@
+services:
+  backend:
+    build:
+      context: ./apps/backend
+    pull_policy: never
+
+  frontend:
+    build:
+      context: ./apps/frontend
+    pull_policy: never
+
+  sandbox-orchestrator:
+    build:
+      context: ./apps/sandbox-orchestrator
+    pull_policy: never
