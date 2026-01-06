@@ -203,6 +203,20 @@ ensure_compose() {
   fi
 }
 
+ensure_public_network() {
+  local network_name="public-net"
+  log_section "Verificando network externa (${network_name})"
+
+  if docker network inspect "${network_name}" >/dev/null 2>&1; then
+    echo "Network '${network_name}' já existe."
+    return
+  fi
+
+  echo "Network '${network_name}' não encontrada. Criando com driver bridge..."
+  docker network create "${network_name}" >/dev/null
+  echo "Network '${network_name}' criada com sucesso."
+}
+
 ensure_deploy_key() {
   log_section "Gerando chave SSH para deploy"
 
@@ -423,6 +437,7 @@ EOF
 ensure_base_packages
 install_docker
 ensure_compose
+ensure_public_network
 ensure_deploy_key
 collect_env_values
 create_env_file
