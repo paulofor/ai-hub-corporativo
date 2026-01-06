@@ -26,9 +26,9 @@ infra/
 
 ## Desenvolvimento local
 
-1. Ajuste as variáveis em `.env` na raiz (já versionado com valores padrão compatíveis com a VPS) e, se necessário, personalize também `apps/backend/.env.example` e `apps/frontend/.env.example`. O campo `DB_PASS` já está configurado com a senha atual (`S3nh@Fort3!`); se a senha for rotacionada, atualize o valor nesses arquivos antes de reiniciar os contêineres.
+1. Ajuste as variáveis em `.env` na raiz (já versionado com valores padrão compatíveis com a VPS) e, se necessário, personalize também `apps/backend/.env.example` e `apps/frontend/.env.example`. O campo `DB_PASS` já está configurado com a senha atual (`S3nh@Fort3`) e os padrões de `DB_URL`/`DB_USER` apontam para o MySQL `jdbc:mysql://d555d.vps-kinghost.net:3306/aihubcorpdb` com usuário `aihubcorp_usr`; se a senha for rotacionada, atualize o valor nesses arquivos antes de reiniciar os contêineres.
 2. Crie a rede compartilhada `public-net` (usada pelo nginx e pelos serviços expostos) uma única vez com `docker network create public-net`.
-3. Garanta que você tenha um MySQL acessível (pode reutilizar o mesmo da produção ou apontar para outro ambiente) e então execute `docker compose pull && docker compose up -d` para subir backend, frontend e sandbox-orchestrator.
+3. Garanta que você tenha um MySQL acessível (pode reutilizar o mesmo da produção ou apontar para outro ambiente) e então execute `docker compose pull && docker compose up -d` para subir backend, frontend, sandbox-orchestrator e o reverse-proxy (nginx).
 4. Instale o Maven localmente para executar comandos do backend (`mvn test`, `mvn clean package`). A imagem do sandbox já vem com Maven e JDK pré-instalados; se precisar configurar a sua máquina, siga [este passo a passo](docs/maven-setup.md).
 5. A UI estará disponível em `http://localhost:8082`, a API em `http://localhost:8081` e o sandbox-orchestrator em `http://localhost:8083`.
 
@@ -53,7 +53,7 @@ infra/
 - As imagens publicadas na pipeline ficam disponíveis em `ghcr.io/<seu-usuário>/ai-hub-corporativo-backend`, `ghcr.io/<seu-usuário>/ai-hub-corporativo-frontend` e `ghcr.io/<seu-usuário>/ai-hub-corporativo-sandbox`.
 - Para que o deploy automático funcione, crie os secrets `GHCR_USERNAME` e `GHCR_TOKEN` (um PAT com escopo `read:packages`) no repositório — eles serão usados para executar `docker login` na VPS antes de `docker compose pull`.
 - Utilize o exemplo `infra/lightsail/containers.example.json` para provisionar o serviço no AWS Lightsail Container Service.
-- Em uma VPS genérica (como Locaweb), execute `sudo ./infra/setup_vps.sh` para instalar dependências, gerar `.env` com as credenciais do MySQL 5.7 hospedado em `d555d.vps-kinghost.net` e subir os contêineres via Docker Compose.
+- Em uma VPS genérica (como Locaweb), execute `sudo ./infra/setup_vps.sh` para instalar dependências, gerar `.env` com as credenciais do MySQL 5.7 hospedado em `d555d.vps-kinghost.net` (schema `aihubcorpdb`, usuário `aihubcorp_usr`) e subir os contêineres via Docker Compose.
 
 ## CI/CD
 
