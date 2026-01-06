@@ -345,9 +345,9 @@ EOF
 
   echo
   echo "Configurando banco de dados MySQL provisionado na hospedagem"
-  DB_URL="jdbc:mysql://d555d.vps-kinghost.net:3306/aihubdb"
-  DB_USER="aihubdb_user"
-  DB_PASS="A9m#Q2v@T7x%L4n*Z6p+H3c&B8d-K1r5J"
+  DB_URL="jdbc:mysql://d555d.vps-kinghost.net:3306/aihubcorpdb"
+  DB_USER="aihubcorp_usr"
+  DB_PASS="S3nh@Fort3"
 
   echo
   echo "Para o GITHUB_PRIVATE_KEY_PEM você pode informar um caminho para o arquivo .pem."
@@ -425,7 +425,7 @@ Configuração concluída! Principais informações:
 - Frontend publicado na porta: ${FRONTEND_HTTP_PORT}
 - Backend publicado na porta: ${BACKEND_HTTP_PORT}
 - Sandbox publicado na porta: ${SANDBOX_ORCHESTRATOR_HTTP_PORT}
-- Banco de dados externo: jdbc:mysql://d555d.vps-kinghost.net:3306/aihubdb
+- Banco de dados externo: jdbc:mysql://d555d.vps-kinghost.net:3306/aihubcorpdb
 - Chave privada do deploy: ${DEPLOY_KEY_PATH}
 - authorized_keys atualizado em: ${HOME}/.ssh/authorized_keys
 
