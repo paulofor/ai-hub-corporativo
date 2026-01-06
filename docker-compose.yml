@@ -3,6 +3,7 @@ services:
     image: ${BACKEND_IMAGE:-ghcr.io/paulodb/ai-hub-corporativo-backend:latest}
     build:
       context: ./apps/backend
+    pull_policy: never
     command: >
       /bin/sh -c "if [ -f /run/secrets/openai-token/openai_api_key ]; then
         export OPENAI_API_KEY=$(cat /run/secrets/openai-token/openai_api_key);
@@ -27,6 +28,7 @@ services:
     image: ${FRONTEND_IMAGE:-ghcr.io/paulodb/ai-hub-corporativo-frontend:latest}
     build:
       context: ./apps/frontend
+    pull_policy: never
     env_file:
       - apps/frontend/.env.example
       - .env
@@ -74,6 +76,7 @@ services:
     image: ${SANDBOX_ORCHESTRATOR_IMAGE:-ghcr.io/paulodb/ai-hub-corporativo-sandbox:latest}
     build:
       context: ./apps/sandbox-orchestrator
+    pull_policy: never
     env_file:
       - apps/sandbox-orchestrator/.env.example
       - .env
