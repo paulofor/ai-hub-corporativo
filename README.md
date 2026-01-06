@@ -28,14 +28,16 @@ infra/
 
 1. Ajuste as variáveis em `.env` na raiz (já versionado com valores padrão compatíveis com a VPS) e, se necessário, personalize também `apps/backend/.env.example` e `apps/frontend/.env.example`. O campo `DB_PASS` já está configurado com a senha atual (`S3nh@Fort3!`); se a senha for rotacionada, atualize o valor nesses arquivos antes de reiniciar os contêineres.
 2. Crie a rede compartilhada `public-net` (usada pelo nginx e pelos serviços expostos) uma única vez com `docker network create public-net`.
-3. Garanta que você tenha um MySQL acessível (pode reutilizar o mesmo da produção ou apontar para outro ambiente) e então execute `docker-compose up --build` para subir backend, frontend e sandbox-orchestrator.
+3. Garanta que você tenha um MySQL acessível (pode reutilizar o mesmo da produção ou apontar para outro ambiente) e então execute `docker compose pull && docker compose up -d` para subir backend, frontend e sandbox-orchestrator.
 4. Instale o Maven localmente para executar comandos do backend (`mvn test`, `mvn clean package`). A imagem do sandbox já vem com Maven e JDK pré-instalados; se precisar configurar a sua máquina, siga [este passo a passo](docs/maven-setup.md).
 5. A UI estará disponível em `http://localhost:8082`, a API em `http://localhost:8081` e o sandbox-orchestrator em `http://localhost:8083`.
+
+> 💡 Para compilar as imagens localmente (sem depender das builds do GitHub Actions), use `docker compose -f docker-compose.yml -f docker-compose.build.yml up --build -d`. O arquivo `docker-compose.build.yml` adiciona de volta as diretivas de `build` para cada serviço.
 
 ### Armazenamento do token da OpenAI na VPS
 
 - Para guardar o token da OpenAI em um arquivo físico na VPS, use o caminho `/root/infra/openai-token/openai_api_key` (já esperado pelos contêineres por padrão). Esse diretório é montado como volume somente leitura no `sandbox-orchestrator` e, se o arquivo existir, o conteúdo é exportado como `OPENAI_API_KEY` antes de iniciar o serviço.
-- Caso prefira armazenar o arquivo em outro diretório, defina `OPENAI_TOKEN_HOST_DIR` no `.env` apontando para a pasta que contém o `openai_api_key` antes de executar `docker-compose up`.
+- Caso prefira armazenar o arquivo em outro diretório, defina `OPENAI_TOKEN_HOST_DIR` no `.env` apontando para a pasta que contém o `openai_api_key` antes de executar `docker compose up`.
 - Caso o arquivo não esteja presente, o comportamento permanece igual ao anterior: as variáveis de ambiente definidas em `.env` continuam sendo usadas.
 
 ## Testes

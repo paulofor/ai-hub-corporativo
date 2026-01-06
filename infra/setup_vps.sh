@@ -410,10 +410,10 @@ create_env_file() {
 }
 
 bring_up_stack() {
-  log_section "Construindo e subindo os contêineres"
+  log_section "Atualizando e subindo os contêineres"
   "${COMPOSE_CMD[@]}" down --remove-orphans >/dev/null 2>&1 || true
   "${COMPOSE_CMD[@]}" pull
-  "${COMPOSE_CMD[@]}" up --build -d
+  "${COMPOSE_CMD[@]}" up -d
 }
 
 print_summary() {
