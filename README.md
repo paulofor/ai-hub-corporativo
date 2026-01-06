@@ -40,6 +40,20 @@ infra/
 - Caso prefira armazenar o arquivo em outro diretório, defina `OPENAI_TOKEN_HOST_DIR` no `.env` apontando para a pasta que contém o `openai_api_key` antes de executar `docker compose up`.
 - Caso o arquivo não esteja presente, o comportamento permanece igual ao anterior: as variáveis de ambiente definidas em `.env` continuam sendo usadas.
 
+### Autenticação no GHCR para `docker compose pull`
+
+- As imagens do backend, frontend e sandbox ficam publicadas no GitHub Container Registry (GHCR). Se o repositório estiver privado, o `docker compose pull` retornará `denied` até que você esteja autenticado.
+- Crie um Personal Access Token (PAT) com escopo `read:packages` e faça login antes de rodar o compose:
+
+  ```bash
+  export GHCR_USERNAME="seu-usuario"
+  export GHCR_TOKEN="seu-pat"
+  echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
+  docker compose pull && docker compose up -d
+  ```
+
+- Caso não tenha acesso ao GHCR, use o fallback local: `docker compose -f docker-compose.yml -f docker-compose.build.yml up --build -d` para montar as imagens na sua máquina sem precisar baixá-las do registry.
+
 ## Testes
 
 - Backend: `mvn -f apps/backend test`
