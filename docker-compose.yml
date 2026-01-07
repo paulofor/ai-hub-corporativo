@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ${BACKEND_IMAGE:-ghcr.io/paulodb/ai-hub-corporativo-backend:latest}
+    image: ${BACKEND_IMAGE:-ghcr.io/paulofor/ai-hub-corporativo-backend:latest}
     pull_policy: missing
     command: >
       /bin/sh -c "if [ -f /run/secrets/openai-token/openai_api_key ]; then
@@ -23,7 +23,7 @@ services:
           - backend
 
   frontend:
-    image: ${FRONTEND_IMAGE:-ghcr.io/paulodb/ai-hub-corporativo-frontend:latest}
+    image: ${FRONTEND_IMAGE:-ghcr.io/paulofor/ai-hub-corporativo-frontend:latest}
     pull_policy: missing
     env_file:
       - apps/frontend/.env.example
@@ -69,7 +69,7 @@ services:
       - ./infra/nginx/certbot-www:/var/www/certbot
 
   sandbox-orchestrator:
-    image: ${SANDBOX_ORCHESTRATOR_IMAGE:-ghcr.io/paulodb/ai-hub-corporativo-sandbox:latest}
+    image: ${SANDBOX_ORCHESTRATOR_IMAGE:-ghcr.io/paulofor/ai-hub-corporativo-sandbox:latest}
     pull_policy: missing
     env_file:
       - apps/sandbox-orchestrator/.env.example
