@@ -11,6 +11,7 @@ services:
       - apps/backend/.env.example
       - .env
     depends_on:
+      - db
       - sandbox-orchestrator
     volumes:
       - ./infra:/infra
@@ -92,7 +93,26 @@ services:
         aliases:
           - sandbox-orchestrator
 
+  db:
+    image: mysql:5.7
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-aihub}
+      MYSQL_USER: ${DB_USER:-aihub}
+      MYSQL_PASSWORD: ${DB_PASS:-aihub}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASS:-root}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    networks:
+      default:
+        aliases:
+          - db
+
 networks:
   default:
   public-net:
     external: true
+
+volumes:
+  mysql-data:
