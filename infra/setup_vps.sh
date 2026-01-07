@@ -78,6 +78,19 @@ log_section() {
   echo "===================="
 }
 
+expand_path() {
+  local path="$1"
+  if [[ -z "${path}" ]]; then
+    printf '%s' ""
+    return
+  fi
+  if [[ "${path}" == ~* ]]; then
+    printf '%s' "${path/#\~/${HOME}}"
+  else
+    printf '%s' "${path}"
+  fi
+}
+
 ensure_base_packages() {
   log_section "Instalando dependências básicas"
   case "${PACKAGE_MANAGER}" in
@@ -374,6 +387,21 @@ PY
     read -r -p "GITHUB_PRIVATE_KEY_PEM (use \\n para quebras de linha, Enter para deixar vazio): " key_value
   fi
   GITHUB_PRIVATE_KEY_PEM="${key_value}"
+
+  prompt_with_default GHCR_REGISTRY "Registro de contêiner (ex.: ghcr.io)" "ghcr.io"
+  prompt_with_default GHCR_USERNAME "Usuário/organização no registry (deixe vazio se não precisar)" ""
+  prompt_secret GHCR_TOKEN "Token/PAT com escopo read:packages para ${GHCR_REGISTRY} (Enter para deixar vazio)"
+  prompt_with_default GHCR_TOKEN_FILE "Arquivo para armazenar o token (opcional)" ""
+  GHCR_TOKEN_FILE="$(expand_path "${GHCR_TOKEN_FILE}")"
+  if [ -z "${GHCR_TOKEN}" ] && [ -n "${GHCR_TOKEN_FILE}" ] && [ -r "${GHCR_TOKEN_FILE}" ]; then
+    GHCR_TOKEN="$(<"${GHCR_TOKEN_FILE}")"
+    echo "Token carregado de ${GHCR_TOKEN_FILE}."
+  elif [ -n "${GHCR_TOKEN}" ] && [ -n "${GHCR_TOKEN_FILE}" ]; then
+    mkdir -p "$(dirname "${GHCR_TOKEN_FILE}")"
+    printf '%s\n' "${GHCR_TOKEN}" > "${GHCR_TOKEN_FILE}"
+    chmod 600 "${GHCR_TOKEN_FILE}" 2>/dev/null || true
+    echo "Token salvo em ${GHCR_TOKEN_FILE}."
+  fi
 }
 
 create_env_file() {
@@ -393,6 +421,10 @@ create_env_file() {
     printf 'GITHUB_INSTALLATION_ID=%s\n' "${GITHUB_INSTALLATION_ID}"
     printf 'GITHUB_WEBHOOK_SECRET=%s\n' "${GITHUB_WEBHOOK_SECRET}"
     printf 'GITHUB_ORG_DEFAULT=%s\n' "${GITHUB_ORG_DEFAULT}"
+    printf 'GHCR_REGISTRY=%s\n' "${GHCR_REGISTRY}"
+    printf 'GHCR_USERNAME=%s\n' "${GHCR_USERNAME}"
+    printf 'GHCR_TOKEN=%s\n' "${GHCR_TOKEN}"
+    printf 'GHCR_TOKEN_FILE=%s\n' "${GHCR_TOKEN_FILE}"
     printf 'DB_URL=%s\n' "${DB_URL}"
     printf 'DB_USER=%s\n' "${DB_USER}"
     printf 'DB_PASS=%s\n' "${DB_PASS}"
@@ -411,6 +443,10 @@ create_env_file() {
 
 bring_up_stack() {
   log_section "Atualizando e subindo os contêineres"
+  local login_script="${REPO_DIR}/infra/bin/ensure-ghcr-login.sh"
+  if [ -x "${login_script}" ]; then
+    "${login_script}" || true
+  fi
   "${COMPOSE_CMD[@]}" down --remove-orphans >/dev/null 2>&1 || true
   "${COMPOSE_CMD[@]}" pull
   "${COMPOSE_CMD[@]}" up -d
