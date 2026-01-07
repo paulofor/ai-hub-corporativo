@@ -43,15 +43,9 @@ infra/
 ### Autenticação no GHCR para `docker compose pull`
 
 - As imagens do backend, frontend e sandbox ficam publicadas no GitHub Container Registry (GHCR). Se o repositório estiver privado, o `docker compose pull` retornará `denied` até que você esteja autenticado.
-- Crie um Personal Access Token (PAT) com escopo `read:packages` e faça login antes de rodar o compose:
-
-  ```bash
-  export GHCR_USERNAME="seu-usuario"
-  export GHCR_TOKEN="seu-pat"
-  echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
-  docker compose pull && docker compose up -d
-  ```
-
+- Preencha `GHCR_USERNAME` e `GHCR_TOKEN` (ou `GHCR_TOKEN_FILE`) no `.env`. O script `infra/setup_vps.sh` já pergunta esses valores e pode persistir o PAT em um arquivo seguro (permissão `600`) para reaproveitar o login automaticamente.
+- Execute `./infra/bin/ensure-ghcr-login.sh` (ou simplesmente deixe o próprio `infra/setup_vps.sh` chamá-lo). Ele lê as variáveis do `.env`, roda `docker login ghcr.io` para você e grava as credenciais no `~/.docker/config.json`, permitindo que futuros `docker compose pull && docker compose up -d` funcionem sem intervenção humana.
+- Se preferir não deixar o token exposto no `.env`, salve-o em um arquivo e aponte `GHCR_TOKEN_FILE=/caminho/do/token`. O helper cuidará da leitura do arquivo antes de autenticar.
 - Caso não tenha acesso ao GHCR, use o fallback local: `docker compose -f docker-compose.yml -f docker-compose.build.yml up --build -d` para montar as imagens na sua máquina sem precisar baixá-las do registry.
 
 ## Testes
