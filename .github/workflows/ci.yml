@@ -54,6 +54,7 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     permissions:
       contents: read
       packages: write
@@ -99,7 +100,7 @@ jobs:
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/ai-hub-corporativo-sandbox:buildcache,mode=max
 
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
       - backend
       - frontend
