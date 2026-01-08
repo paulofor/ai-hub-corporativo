@@ -39,11 +39,42 @@ services:
         aliases:
           - aihub-frontend
 
+  reverse-proxy-cert-init:
+    image: alpine:3.19
+    restart: "no"
+    command:
+      - /bin/sh
+      - -c
+      - |
+          set -euo pipefail
+          apk add --no-cache openssl >/dev/null
+          live_dir=/etc/letsencrypt/live/iahubcorp.online
+          fullchain="$live_dir/fullchain.pem"
+          privkey="$live_dir/privkey.pem"
+          if [ -s "$fullchain" ] && [ -s "$privkey" ]; then
+            echo "Existing certificate detected."
+            exit 0
+          fi
+          mkdir -p "$live_dir"
+          openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
+            -keyout "$privkey" \
+            -out "$fullchain" \
+            -subj "/CN=iahubcorp.online"
+          chmod 600 "$privkey"
+          chmod 644 "$fullchain"
+          echo "Self-signed certificate generated for iahubcorp.online."
+    volumes:
+      - ./infra/nginx/letsencrypt:/etc/letsencrypt
+
   reverse-proxy:
     image: nginx:1.25-alpine
     depends_on:
-      - frontend
-      - backend
+      reverse-proxy-cert-init:
+        condition: service_completed_successfully
+      frontend:
+        condition: service_started
+      backend:
+        condition: service_started
     ports:
       - "80:80"
       - "443:443"
