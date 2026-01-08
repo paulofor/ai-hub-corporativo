@@ -2,6 +2,8 @@
 
 Configuração para atender frontend e backend via HTTPS usando **nginx + Let's Encrypt**.
 
+> **Nota**: o `docker-compose.yml` possui o serviço auxiliar `reverse-proxy-cert-init`, que gera automaticamente um certificado autoassinado em `infra/nginx/letsencrypt/live/iahubcorp.online/` caso nenhum arquivo seja encontrado. Ele serve apenas para evitar que o nginx falhe ao subir, mas resultará em alertas de segurança no navegador. Para operação real em produção substitua-o pelos certificados emitidos via Let's Encrypt seguindo os passos abaixo.
+
 ## Pré-requisitos
 
 - Domínio `iahubcorp.online` já apontado para o IP público da VPS.
