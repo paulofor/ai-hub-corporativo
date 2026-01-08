@@ -49,19 +49,19 @@ services:
           set -euo pipefail
           apk add --no-cache openssl >/dev/null
           live_dir=/etc/letsencrypt/live/iahubcorp.online
-          fullchain="$live_dir/fullchain.pem"
-          privkey="$live_dir/privkey.pem"
-          if [ -s "$fullchain" ] && [ -s "$privkey" ]; then
+          fullchain="$$live_dir/fullchain.pem"
+          privkey="$$live_dir/privkey.pem"
+          if [ -s "$$fullchain" ] && [ -s "$$privkey" ]; then
             echo "Existing certificate detected."
             exit 0
           fi
-          mkdir -p "$live_dir"
+          mkdir -p "$$live_dir"
           openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
-            -keyout "$privkey" \
-            -out "$fullchain" \
+            -keyout "$$privkey" \
+            -out "$$fullchain" \
             -subj "/CN=iahubcorp.online"
-          chmod 600 "$privkey"
-          chmod 644 "$fullchain"
+          chmod 600 "$$privkey"
+          chmod 644 "$$fullchain"
           echo "Self-signed certificate generated for iahubcorp.online."
     volumes:
       - ./infra/nginx/letsencrypt:/etc/letsencrypt
