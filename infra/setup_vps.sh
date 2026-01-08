@@ -95,10 +95,10 @@ ensure_base_packages() {
   log_section "Instalando dependências básicas"
   case "${PACKAGE_MANAGER}" in
     apt)
-      install_packages ca-certificates curl git python3 openssh-client
+      install_packages ca-certificates curl git python3 openssh-client openssl
       ;;
     dnf|yum)
-      install_packages ca-certificates curl git python3 openssh-clients
+      install_packages ca-certificates curl git python3 openssh-clients openssl
       ;;
   esac
 }
@@ -441,6 +441,28 @@ create_env_file() {
   chmod 600 "${env_file}"
 }
 
+ensure_reverse_proxy_certs() {
+  local domain="iahubcorp.online"
+  local live_dir="${REPO_DIR}/infra/nginx/letsencrypt/live/${domain}"
+  local fullchain="${live_dir}/fullchain.pem"
+  local privkey="${live_dir}/privkey.pem"
+
+  log_section "Verificando certificados do reverse proxy"
+
+  if [[ -f "${fullchain}" && -f "${privkey}" ]]; then
+    echo "Certificados existentes encontrados para ${domain}."
+    return
+  fi
+
+  echo "Nenhum certificado encontrado. Gerando certificado autoassinado provisório para ${domain}..."
+  mkdir -p "${live_dir}"
+  openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
+    -subj "/CN=${domain}" \
+    -keyout "${privkey}" \
+    -out "${fullchain}"
+  echo "Certificado autoassinado criado. Substitua-o via Certbot conforme docs/https.md."
+}
+
 bring_up_stack() {
   log_section "Atualizando e subindo os contêineres"
   local login_script="${REPO_DIR}/infra/bin/ensure-ghcr-login.sh"
@@ -477,5 +499,6 @@ ensure_public_network
 ensure_deploy_key
 collect_env_values
 create_env_file
+ensure_reverse_proxy_certs
 bring_up_stack
 print_summary
