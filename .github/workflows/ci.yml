@@ -135,6 +135,9 @@ jobs:
             -e "ssh ${SSH_COMMON_ARGS}" \
             --exclude '.git/' \
             --exclude 'node_modules/' \
+            --exclude 'infra/nginx/letsencrypt/' \
+            --exclude 'infra/openai-token/' \
+            --exclude '.env' \
             ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${REMOTE_PATH}"
       - name: Authenticate registry on VPS
         run: |
