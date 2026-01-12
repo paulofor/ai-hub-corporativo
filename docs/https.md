@@ -11,6 +11,7 @@ Configuração para atender frontend e backend via HTTPS usando **nginx + Let's 
 - Repositório clonado na VPS e Docker/Compose instalados (use `sudo ./infra/setup_vps.sh` se ainda não fez).
 
 As chaves emitidas ficam persistidas em `infra/nginx/letsencrypt` e são montadas pelo nginx.
+O diretório não é versionado; por isso, garanta que qualquer automação de deploy preserve essa pasta (o workflow do GitHub Actions já a mantém fora do `rsync --delete`).
 
 ## 1) Emitir o primeiro certificado
 
