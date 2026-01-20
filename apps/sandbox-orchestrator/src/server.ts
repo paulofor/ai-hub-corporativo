@@ -55,7 +55,7 @@ export function createApp(options: AppOptions = {}) {
   if (process.env.NODE_ENV !== 'test') {
     app.use(morgan('combined'));
   }
-  const jsonLimit = process.env.JSON_BODY_LIMIT ?? '15mb';
+  const jsonLimit = process.env.JSON_BODY_LIMIT ?? '25mb';
   app.use(express.json({ limit: jsonLimit }));
 
   const healthcheckPythonInfo = () => {
@@ -171,7 +171,11 @@ export function createApp(options: AppOptions = {}) {
     res.json(job);
   });
 
-  app.use((err: Error, _req: Request, res: Response, _next: () => void) => {
+  app.use((err: Error & { type?: string; limit?: number }, _req: Request, res: Response, _next: () => void) => {
+    if (err?.type === 'entity.too.large') {
+      console.warn('Sandbox orchestrator: payload excedeu o limite configurado', err);
+      return res.status(413).json({ error: 'payload_too_large', limit: jsonLimit });
+    }
     console.error('Unexpected error handling request', err);
     res.status(500).json({ error: 'internal_error' });
   });
