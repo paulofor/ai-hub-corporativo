@@ -55,7 +55,7 @@ export function createApp(options: AppOptions = {}) {
   if (process.env.NODE_ENV !== 'test') {
     app.use(morgan('combined'));
   }
-  const jsonLimit = process.env.JSON_BODY_LIMIT ?? '25mb';
+  const jsonLimit = process.env.JSON_BODY_LIMIT ?? '250mb';
   app.use(express.json({ limit: jsonLimit }));
 
   const healthcheckPythonInfo = () => {
