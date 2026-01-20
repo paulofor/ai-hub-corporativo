@@ -389,9 +389,14 @@ export class SandboxJobProcessor implements JobProcessor {
     }
 
     const dir = path.relative(repoPath, this.problemFilesDir(repoPath)) || '.';
-    const names = files.map((file) => file.filename).filter(Boolean);
+    const names = files
+      .map((file) => {
+        const label = file.filename;
+        return file.contentType ? `${label} [${file.contentType}]` : label;
+      })
+      .filter(Boolean);
     const list = names.length > 0 ? ` (arquivos: ${names.join(', ')})` : '';
-    return `\nArquivos enviados pelo usuário descrevendo o problema estão disponíveis em ${dir}${list}. Leia-os antes de sugerir ajustes.`;
+    return `\nArquivos adicionais enviados pelo usuário (incluindo documentos ou imagens da solicitação) estão disponíveis em ${dir}${list}. Considere-os na investigação antes de sugerir ajustes.`;
   }
 
   private buildTools(repoPath: string) {
