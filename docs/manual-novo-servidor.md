@@ -40,7 +40,7 @@ Durante o wizard:
 
 ## 4) Colocar segredos locais necessários
 
-- **OpenAI**: grave a chave em `/root/infra/openai-token/openai_api_key` (ou ajuste `OPENAI_TOKEN_HOST_DIR` no `.env`).
+- **OpenAI**: grave a chave em `/root/infra/openai-token/openai_api_key` (ou ajuste `OPENAI_TOKEN_HOST_DIR` no `.env`). Se você já usa `/root/infra/openai-token/open_api_key`, o serviço também aceita esse nome.
 - **Certificados TLS**: se já possui certificados válidos do servidor antigo, copie o conteúdo de `infra/nginx/letsencrypt` e `infra/nginx/certbot-www` para o mesmo caminho no novo host antes de subir os contêineres. Sem eles, será gerado um certificado autoassinado temporário.
 
 ## 5) Autenticar no registry e subir os contêineres
