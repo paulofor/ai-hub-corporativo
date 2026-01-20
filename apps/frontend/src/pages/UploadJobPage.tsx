@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import client from '../api/client';
 import { useToasts } from '../components/ToastContext';
 
@@ -12,6 +12,12 @@ interface UploadJob {
   error?: string;
   changedFiles?: string[];
   patch?: string;
+}
+
+interface CodexModelOption {
+  id: string;
+  modelName: string;
+  displayName?: string;
 }
 
 const ownerHeaders = { 'X-Role': 'owner', 'X-User': 'ui-owner' };
@@ -47,6 +53,22 @@ export default function UploadJobPage() {
   const [jobs, setJobs] = useState<UploadJob[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [modelOptions, setModelOptions] = useState<CodexModelOption[]>([]);
+
+  useEffect(() => {
+    client
+      .get<CodexModelOption[]>('/codex/models')
+      .then((response) => {
+        setModelOptions(response.data);
+        setModel((current) => {
+          if (current && response.data.some((item) => item.modelName === current)) {
+            return current;
+          }
+          return '';
+        });
+      })
+      .catch((err: Error) => setError(err.message));
+  }, []);
 
   const handleProblemFilesChange = (event: ChangeEvent<HTMLInputElement>) => {
     const selection = event.target.files ? Array.from(event.target.files) : [];
@@ -194,12 +216,25 @@ export default function UploadJobPage() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Modelo (opcional)</label>
-              <input
+              <select
                 value={model}
                 onChange={(event) => setModel(event.target.value)}
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-                placeholder="gpt-5-codex"
-              />
+                disabled={modelOptions.length === 0}
+              >
+                {modelOptions.length === 0 ? (
+                  <option value="">Nenhum modelo cadastrado</option>
+                ) : (
+                  <>
+                    <option value="">Selecione um modelo</option>
+                    {modelOptions.map((option) => (
+                      <option key={option.id} value={option.modelName}>
+                        {(option.displayName ?? option.modelName) + ` — ${option.modelName}`}
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
             </div>
           </div>
 
