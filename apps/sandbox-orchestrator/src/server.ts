@@ -55,7 +55,8 @@ export function createApp(options: AppOptions = {}) {
   if (process.env.NODE_ENV !== 'test') {
     app.use(morgan('combined'));
   }
-  app.use(express.json());
+  const jsonLimit = process.env.JSON_BODY_LIMIT ?? '15mb';
+  app.use(express.json({ limit: jsonLimit }));
 
   const healthcheckPythonInfo = () => {
     const pythonPath = spawnSync('which', ['python3'], { encoding: 'utf-8' });
