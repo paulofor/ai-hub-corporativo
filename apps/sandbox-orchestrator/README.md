@@ -20,7 +20,7 @@ Jobs ficam armazenados em memória enquanto executam e são atualizados de forma
 | Variável | Descrição | Padrão |
 | --- | --- | --- |
 | `PORT` | Porta HTTP exposta pelo serviço | `8080` |
-| `JSON_BODY_LIMIT` | Tamanho máximo aceito no corpo JSON (por exemplo, uploads base64) | `15mb` |
+| `JSON_BODY_LIMIT` | Tamanho máximo aceito no corpo JSON (por exemplo, uploads base64) | `25mb` |
 | `SANDBOX_SLUG_PREFIX` | Prefixo aplicado antes do slug original | *(vazio)* |
 | `SANDBOX_SLUG_SUFFIX` | Sufixo aplicado após o slug original | `-sandbox` |
 | `SANDBOX_IMAGE` | Imagem base utilizada para provisionar o contêiner/VM efêmero | `ghcr.io/ai-hub-corporativo/sandbox:latest` |
