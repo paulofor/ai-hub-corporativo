@@ -137,7 +137,8 @@ export default function UploadJobPage() {
         <div>
           <h2 className="text-2xl font-semibold">Upload de fontes em ZIP</h2>
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            Envie o projeto em ZIP, anexe arquivos (txt, csv etc.) descrevendo o problema e peça recomendações ao modelo.
+            Envie o projeto em ZIP, anexe arquivos da solicitação (documentos, imagens, txt, csv, logs etc.) e peça
+            recomendações ao modelo.
           </p>
         </div>
       </div>
@@ -159,14 +160,15 @@ export default function UploadJobPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Arquivos do problema (txt, csv, logs, etc.)</label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Arquivos da solicitação (docs, imagens, logs, etc.)</label>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Envie arquivos que descrevam o erro encontrado; eles ficarão disponíveis no sandbox junto com o código.
+              Envie documentos, imagens ou arquivos de apoio que façam parte do pedido; eles ficarão disponíveis no
+              sandbox junto com o código.
             </p>
             <input
               type="file"
               multiple
-              accept=".txt,.csv,.md,.log,.json,.yaml,.yml,.xml"
+              accept=".txt,.csv,.md,.log,.json,.yaml,.yml,.xml,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.odt,.odp,.ods,image/*"
               onChange={handleProblemFilesChange}
               className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-emerald-100 file:px-3 file:py-2 file:text-emerald-700 hover:file:bg-emerald-200 dark:text-slate-200 dark:file:bg-emerald-900/40 dark:file:text-emerald-100"
             />
