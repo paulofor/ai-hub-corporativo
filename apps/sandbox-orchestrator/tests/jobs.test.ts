@@ -113,6 +113,25 @@ test('accepts upload job with problem files', async () => {
   assert.equal(stored?.repoUrl, `upload://${payload.jobId}`);
 });
 
+test('accepts upload jobs larger than the default JSON limit', async () => {
+  const registry = new Map<string, SandboxJob>();
+  const app = createApp({ jobRegistry: registry, processor: new StubProcessor() });
+  const largeBase64 = Buffer.alloc(150_000, 'a').toString('base64');
+  const payload = {
+    jobId: 'job-upload-large-body',
+    taskDescription: 'process large upload',
+    uploadedZip: { base64: largeBase64, filename: 'source.zip' },
+  };
+
+  const creation = await request(app).post('/jobs').send(payload).expect(201);
+  assert.equal(creation.body.jobId, payload.jobId);
+
+  const stored = registry.get(payload.jobId);
+  const storedBase64 = stored?.uploadedZip?.base64;
+  assert.ok(storedBase64);
+  assert.ok(storedBase64!.length >= largeBase64.length);
+});
+
 test('respects SANDBOX_WORKDIR when creating workspaces', async () => {
   const originalWorkdir = process.env.SANDBOX_WORKDIR;
   const customBase = await fs.mkdtemp(path.join(os.tmpdir(), 'sandbox-custom-base-'));
