@@ -6,6 +6,8 @@ services:
     command: >
       /bin/sh -c "if [ -f /run/secrets/openai-token/openai_api_key ]; then
         export OPENAI_API_KEY=$(cat /run/secrets/openai-token/openai_api_key);
+      elif [ -f /run/secrets/openai-token/open_api_key ]; then
+        export OPENAI_API_KEY=$(cat /run/secrets/openai-token/open_api_key);
       fi;
       exec java -jar /app/app.jar"
     env_file:
@@ -114,6 +116,8 @@ services:
     command: >
       /bin/sh -c "if [ -f /run/secrets/openai-token/openai_api_key ]; then
         export OPENAI_API_KEY=$(cat /run/secrets/openai-token/openai_api_key);
+      elif [ -f /run/secrets/openai-token/open_api_key ]; then
+        export OPENAI_API_KEY=$(cat /run/secrets/openai-token/open_api_key);
       fi;
       exec node dist/src/index.js"
     networks:
