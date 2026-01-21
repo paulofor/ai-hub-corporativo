@@ -12,6 +12,8 @@ interface UploadJob {
   error?: string;
   changedFiles?: string[];
   patch?: string;
+  resultZipBase64?: string;
+  resultZipFilename?: string;
 }
 
 interface CodexModelOption {
@@ -31,6 +33,14 @@ const parseJob = (payload: unknown): UploadJob => {
     : undefined;
 
   const status = typeof data.status === 'string' ? (data.status.toUpperCase() as JobStatus) : 'PENDING';
+  const resultZipBase64 =
+    typeof data.resultZipBase64 === 'string' && data.resultZipBase64.trim()
+      ? data.resultZipBase64.trim()
+      : undefined;
+  const resultZipFilename =
+    typeof data.resultZipFilename === 'string' && data.resultZipFilename.trim()
+      ? data.resultZipFilename.trim()
+      : undefined;
 
   return {
     jobId: typeof data.jobId === 'string' ? data.jobId : '',
@@ -38,7 +48,9 @@ const parseJob = (payload: unknown): UploadJob => {
     summary: typeof data.summary === 'string' ? data.summary : undefined,
     error: typeof data.error === 'string' ? data.error : undefined,
     changedFiles,
-    patch: typeof data.patch === 'string' ? data.patch : undefined
+    patch: typeof data.patch === 'string' ? data.patch : undefined,
+    resultZipBase64,
+    resultZipFilename
   };
 };
 
@@ -129,6 +141,33 @@ export default function UploadJobPage() {
     const response = await client.get(`/upload-jobs/${jobId}`);
     const parsed = parseJob(response.data);
     setJobs((current) => current.map((job) => (job.jobId === jobId ? parsed : job)));
+  };
+
+  const handleDownloadZip = (job: UploadJob) => {
+    if (!job.resultZipBase64) {
+      return;
+    }
+
+    try {
+      const binaryString = atob(job.resultZipBase64);
+      const length = binaryString.length;
+      const bytes = new Uint8Array(length);
+      for (let i = 0; i < length; i += 1) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: 'application/zip' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = job.resultZipFilename || `${job.jobId}-resultado.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Falha ao preparar ZIP de resultado', err);
+      pushToast('Não foi possível preparar o download do ZIP com os fontes gerados.');
+    }
   };
 
   return (
@@ -317,6 +356,15 @@ export default function UploadJobPage() {
                       ))}
                     </ul>
                   </div>
+                )}
+                {job.status === 'COMPLETED' && job.resultZipBase64 && (
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadZip(job)}
+                    className="mt-3 inline-flex items-center justify-center rounded-md border border-emerald-600 px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-400 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
+                  >
+                    Baixar ZIP com fontes atualizados
+                  </button>
                 )}
                 {job.patch && job.patch.trim() && (
                   <details className="mt-3">

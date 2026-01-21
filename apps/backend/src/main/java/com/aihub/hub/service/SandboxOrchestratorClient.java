@@ -117,6 +117,8 @@ public class SandboxOrchestratorClient {
         String summary,
         List<String> changedFiles,
         String patch,
+        String resultZipBase64,
+        String resultZipFilename,
         String pullRequestUrl,
         String error,
         Integer promptTokens,
@@ -144,12 +146,17 @@ public class SandboxOrchestratorClient {
                 })
                 .toList();
 
+            String resultZipBase64 = readText(node, "resultZipBase64", "result_zip_base64");
+            String resultZipFilename = readText(node, "resultZipFilename", "result_zip_filename");
+
             return new SandboxOrchestratorJobResponse(
                 node.path("jobId").asText(null),
                 node.path("status").asText(null),
                 node.path("summary").asText(null),
                 files.isEmpty() ? null : files,
                 node.path("patch").asText(null),
+                resultZipBase64,
+                resultZipFilename,
                 resolvePullRequestUrl(node),
                 node.path("error").asText(null),
                 resolvePromptTokens(node),
