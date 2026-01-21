@@ -35,6 +35,8 @@ export interface SandboxJob {
   completionTokens?: number;
   totalTokens?: number;
   cost?: number;
+  resultZipBase64?: string;
+  resultZipFilename?: string;
   logs: string[];
   createdAt: string;
   updatedAt: string;

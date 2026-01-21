@@ -152,6 +152,9 @@ export class SandboxJobProcessor implements JobProcessor {
       job.summary = summary;
       job.changedFiles = await this.collectChangedFiles(repoPath, baseCommit);
       job.patch = await this.generatePatch(repoPath, baseCommit);
+      if (isUpload) {
+        await this.attachResultZip(job, repoPath);
+      }
 
       if (isUpload) {
         this.log(job, 'job criado via upload; PR automático será ignorado');
@@ -1003,6 +1006,54 @@ Modo econômico ativo: minimize leituras extensas, priorize comandos curtos, esc
     } catch {
       return '';
     }
+  }
+
+  private async attachResultZip(job: SandboxJob, repoPath: string): Promise<void> {
+    try {
+      const resolvedRoot = path.resolve(repoPath);
+      const zip = new AdmZip();
+      zip.addLocalFolder(resolvedRoot, '', (entryPath) => this.shouldIncludeInResultZip(resolvedRoot, entryPath));
+      const buffer = zip.toBuffer();
+      job.resultZipBase64 = buffer.toString('base64');
+      job.resultZipFilename = this.resolveResultZipFilename(job);
+      this.log(job, `zip final com fontes gerado (${this.formatBytes(buffer.byteLength)})`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(job, `falha ao gerar zip final com fontes: ${message}`);
+    }
+  }
+
+  private shouldIncludeInResultZip(root: string, entryPath: string): boolean {
+    const relative = path.relative(root, entryPath);
+    if (!relative) {
+      return true;
+    }
+    const normalized = relative.split(path.sep).filter(Boolean);
+    return !normalized.some((segment) => segment === '.git');
+  }
+
+  private resolveResultZipFilename(job: SandboxJob): string {
+    const original = job.uploadedZip?.filename;
+    if (original) {
+      const parsed = path.parse(original.trim());
+      const base = parsed.name && parsed.name !== '.' ? parsed.name : 'upload';
+      return `${base}-modificado.zip`;
+    }
+    return `${job.jobId}-resultado.zip`;
+  }
+
+  private formatBytes(bytes: number): string {
+    if (!Number.isFinite(bytes) || bytes <= 0) {
+      return '0 B';
+    }
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let value = bytes;
+    let unitIndex = 0;
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024;
+      unitIndex += 1;
+    }
+    return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
   }
 
   private async isGitRepository(repoPath: string): Promise<boolean> {

@@ -1331,3 +1331,54 @@ test('processes uploaded zip without cloning git', async () => {
   assert.equal(job.status, 'COMPLETED');
   assert.ok(job.logs.some((entry) => entry.includes('upload')));
 });
+
+
+test('upload jobs disponibilizam zip final com fontes ajustados', async () => {
+  const sourceZip = new AdmZip();
+  sourceZip.addFile('README.md', Buffer.from('conteúdo inicial'));
+
+  const fakeOpenAI = {
+    responses: {
+      create: async () => ({
+        output: [
+          {
+            type: 'message',
+            id: 'msg-upload-zip',
+            role: 'assistant',
+            status: 'completed',
+            content: [{ type: 'output_text', text: 'done', annotations: [] }],
+          },
+        ],
+      }),
+    },
+  } as any;
+
+  const processor = new SandboxJobProcessor(undefined, 'gpt-5-codex', fakeOpenAI);
+  (processor as any).cleanup = async () => {};
+
+  const now = new Date().toISOString();
+  const job: SandboxJob = {
+    jobId: 'job-upload-zip',
+    repoUrl: 'upload://job-upload-zip',
+    branch: 'upload',
+    taskDescription: 'ajustar fontes do upload',
+    status: 'PENDING',
+    logs: [],
+    createdAt: now,
+    updatedAt: now,
+    uploadedZip: { base64: sourceZip.toBuffer().toString('base64'), filename: 'fontes.zip' },
+  } as SandboxJob;
+
+  await processor.process(job);
+
+  assert.equal(job.status, 'COMPLETED');
+  assert.ok(job.resultZipBase64, 'resultZipBase64 deve estar preenchido');
+  assert.ok(job.resultZipFilename?.endsWith('.zip'), 'resultZipFilename deve ser um zip');
+
+  const buffer = Buffer.from(job.resultZipBase64!, 'base64');
+  assert.ok(buffer.byteLength > 0, 'zip final não pode estar vazio');
+  const resultZip = new AdmZip(buffer);
+  const entries = resultZip.getEntries().map((entry) => entry.entryName);
+  assert.ok(entries.includes('README.md'));
+  assert.ok(entries.every((entry) => !entry.startsWith('.git/')));
+});
