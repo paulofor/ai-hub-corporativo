@@ -1,21 +1,21 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import client from '../api/client';
 import { useToasts } from '../components/ToastContext';
+import {
+  buildJobTitle,
+  downloadUploadJobZip,
+  getUploadJobStatusClassName,
+  MAX_STORED_UPLOAD_JOBS,
+  parseUploadJob,
+  readStoredJobs,
+  resolveUploadJobTitle,
+  writeStoredJobs,
+  UploadJob
+} from '../utils/uploadJobs';
 
-type JobStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+
 type SandboxProfile = 'STANDARD' | 'ECONOMY';
-
-interface UploadJob {
-  jobId: string;
-  status: JobStatus;
-  summary?: string;
-  error?: string;
-  changedFiles?: string[];
-  patch?: string;
-  resultZipBase64?: string;
-  resultZipFilename?: string;
-  title?: string;
-}
 
 interface CodexModelOption {
   id: string;
@@ -24,86 +24,6 @@ interface CodexModelOption {
 }
 
 const ownerHeaders = { 'X-Role': 'owner', 'X-User': 'ui-owner' };
-const storedJobsKey = 'aihub.uploadJobs';
-const maxStoredJobs = 10;
-const maxTitleLength = 20;
-
-interface StoredJob {
-  jobId: string;
-  title: string;
-}
-
-const parseJob = (payload: unknown): UploadJob => {
-  const data = (payload ?? {}) as Record<string, unknown>;
-  const changedFiles = Array.isArray(data.changedFiles)
-    ? (data.changedFiles as unknown[])
-        .map((item) => (typeof item === 'string' ? item.trim() : ''))
-        .filter(Boolean)
-    : undefined;
-
-  const status = typeof data.status === 'string' ? (data.status.toUpperCase() as JobStatus) : 'PENDING';
-  const resultZipBase64 =
-    typeof data.resultZipBase64 === 'string' && data.resultZipBase64.trim()
-      ? data.resultZipBase64.trim()
-      : undefined;
-  const resultZipFilename =
-    typeof data.resultZipFilename === 'string' && data.resultZipFilename.trim()
-      ? data.resultZipFilename.trim()
-      : undefined;
-
-  return {
-    jobId: typeof data.jobId === 'string' ? data.jobId : '',
-    status,
-    summary: typeof data.summary === 'string' ? data.summary : undefined,
-    error: typeof data.error === 'string' ? data.error : undefined,
-    changedFiles,
-    patch: typeof data.patch === 'string' ? data.patch : undefined,
-    resultZipBase64,
-    resultZipFilename
-  };
-};
-
-const buildJobTitle = (task: string) => {
-  const normalized = task.replace(/\s+/g, ' ').trim();
-  if (!normalized) {
-    return 'Sem título';
-  }
-  if (normalized.length <= maxTitleLength) {
-    return normalized;
-  }
-  return normalized.slice(0, maxTitleLength).trimEnd();
-};
-
-const readStoredJobs = (): StoredJob[] => {
-  try {
-    const raw = localStorage.getItem(storedJobsKey);
-    if (!raw) {
-      return [];
-    }
-    const parsed = JSON.parse(raw) as StoredJob[];
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed
-      .filter((item) => item && typeof item.jobId === 'string' && typeof item.title === 'string')
-      .slice(0, maxStoredJobs);
-  } catch (err) {
-    console.warn('Falha ao carregar jobs salvos', err);
-    return [];
-  }
-};
-
-const writeStoredJobs = (jobs: UploadJob[]) => {
-  const payload: StoredJob[] = jobs
-    .filter((job) => job.jobId && job.title)
-    .map((job) => ({ jobId: job.jobId, title: job.title ?? 'Sem título' }))
-    .slice(0, maxStoredJobs);
-  try {
-    localStorage.setItem(storedJobsKey, JSON.stringify(payload));
-  } catch (err) {
-    console.warn('Falha ao salvar jobs', err);
-  }
-};
 
 export default function UploadJobPage() {
   const { pushToast } = useToasts();
@@ -113,38 +33,46 @@ export default function UploadJobPage() {
   const [model, setModel] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [problemFiles, setProblemFiles] = useState<File[]>([]);
-  const [jobs, setJobs] = useState<UploadJob[]>([]);
+  const [jobs, setJobs] = useState<UploadJob[]>(() => readStoredJobs());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modelOptions, setModelOptions] = useState<CodexModelOption[]>([]);
   const [jobsLoaded, setJobsLoaded] = useState(false);
 
   useEffect(() => {
-    const stored = readStoredJobs();
-    if (stored.length > 0) {
-      setJobs(
-        stored.map((job) => ({
-          jobId: job.jobId,
-          title: job.title,
-          status: 'PENDING'
-        }))
-      );
-      stored.forEach((job) => {
-        client
-          .get(`/upload-jobs/${job.jobId}`)
-          .then((response) => {
-            const parsed = parseJob(response.data);
-            setJobs((current) =>
-              current.map((item) =>
-                item.jobId === job.jobId ? { ...parsed, title: item.title ?? job.title } : item
-              )
-            );
-          })
-          .catch((err: Error) => {
-            console.warn(`Falha ao atualizar job ${job.jobId}`, err);
-          });
-      });
+    const storedJobs = readStoredJobs();
+    if (storedJobs.length === 0) {
+      setJobsLoaded(true);
+      return;
     }
+
+    storedJobs.forEach((job) => {
+      client
+        .get(`/upload-jobs/${job.jobId}`)
+        .then((response) => {
+          if (!response.data) {
+            return;
+          }
+          const parsed = parseUploadJob(response.data);
+          const responseJobId = parsed.jobId || job.jobId;
+          setJobs((current) =>
+            current.map((item) =>
+              item.jobId === job.jobId
+                ? {
+                    ...item,
+                    ...parsed,
+                    jobId: responseJobId,
+                    title: resolveUploadJobTitle(responseJobId, item.title, parsed.title, job.title)
+                  }
+                : item
+            )
+          );
+        })
+        .catch((err: Error) => {
+          console.warn(`Falha ao atualizar job ${job.jobId}`, err);
+        });
+    });
+
     setJobsLoaded(true);
   }, []);
 
@@ -214,13 +142,13 @@ export default function UploadJobPage() {
       const response = await client.post('/upload-jobs', formData, {
         headers: { 'Content-Type': 'multipart/form-data', ...ownerHeaders }
       });
-      const parsed = parseJob(response.data);
+      const parsed = parseUploadJob(response.data);
       const title = buildJobTitle(trimmedTask);
       const enriched = { ...parsed, title };
       setJobs((current) => [
         enriched,
         ...current.filter((item) => item.jobId !== parsed.jobId)
-      ].slice(0, maxStoredJobs));
+      ].slice(0, MAX_STORED_UPLOAD_JOBS));
       setTaskDescription('');
       setTestCommand('');
       setFile(null);
@@ -235,34 +163,35 @@ export default function UploadJobPage() {
   };
 
   const refreshJob = async (jobId: string) => {
-    const response = await client.get(`/upload-jobs/${jobId}`);
-    const parsed = parseJob(response.data);
-    setJobs((current) =>
-      current.map((job) => (job.jobId === jobId ? { ...parsed, title: job.title } : job))
-    );
+    try {
+      const response = await client.get(`/upload-jobs/${jobId}`);
+      if (!response.data) {
+        pushToast('Job não encontrado no sandbox.');
+        return;
+      }
+      const parsed = parseUploadJob(response.data);
+      const responseJobId = parsed.jobId || jobId;
+      setJobs((current) =>
+        current.map((job) =>
+          job.jobId === jobId
+            ? {
+                ...job,
+                ...parsed,
+                jobId: responseJobId,
+                title: resolveUploadJobTitle(responseJobId, job.title, parsed.title)
+              }
+            : job
+        )
+      );
+    } catch (err) {
+      console.warn(`Falha ao atualizar job ${jobId}`, err);
+      pushToast('Não foi possível atualizar o status do job. Tente novamente.');
+    }
   };
 
   const handleDownloadZip = (job: UploadJob) => {
-    if (!job.resultZipBase64) {
-      return;
-    }
-
     try {
-      const binaryString = atob(job.resultZipBase64);
-      const length = binaryString.length;
-      const bytes = new Uint8Array(length);
-      for (let i = 0; i < length; i += 1) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      const blob = new Blob([bytes], { type: 'application/zip' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = job.resultZipFilename || `${job.jobId}-resultado.zip`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      downloadUploadJobZip(job);
     } catch (err) {
       console.error('Falha ao preparar ZIP de resultado', err);
       pushToast('Não foi possível preparar o download do ZIP com os fontes gerados.');
@@ -416,68 +345,92 @@ export default function UploadJobPage() {
         </form>
 
         <div className="rounded-xl border border-slate-200 bg-white/70 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-          <h3 className="text-lg font-semibold mb-3">Jobs enviados</h3>
-          {jobs.length === 0 && (
+          <h3 className="text-lg font-semibold mb-2">Jobs enviados</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+            Guardamos os últimos {MAX_STORED_UPLOAD_JOBS} jobs no seu navegador. Eles reaparecem aqui quando você voltar para acompanhar o progresso.
+          </p>
+          {jobs.length === 0 ? (
             <p className="text-sm text-slate-500">Nenhum job criado recentemente.</p>
+          ) : (
+            <div className="space-y-4">
+              {jobs.map((job) => {
+                const title = resolveUploadJobTitle(job.jobId, job.title);
+                const lastUpdatedLabel = job.lastSyncedAt ? new Date(job.lastSyncedAt).toLocaleString() : null;
+                return (
+                  <div key={job.jobId} className="rounded border border-slate-200 dark:border-slate-800 p-3 text-sm">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold">{title}</p>
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${getUploadJobStatusClassName(job.status)}`}>
+                            {job.status}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          ID: {job.jobId}
+                          {lastUpdatedLabel && <> • Atualizado em {lastUpdatedLabel}</>}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-emerald-700">
+                        <button type="button" onClick={() => refreshJob(job.jobId)} className="hover:underline">
+                          Atualizar
+                        </button>
+                        <Link to={`/upload-jobs/${job.jobId}`} className="text-emerald-700 hover:underline dark:text-emerald-300">
+                          Ver detalhes
+                        </Link>
+                      </div>
+                    </div>
+                    {job.summary && (
+                      <div className="mt-2">
+                        <p className="text-xs font-semibold text-slate-600 dark:text-slate-200">Resumo</p>
+                        <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{job.summary}</p>
+                      </div>
+                    )}
+                    {job.error && (
+                      <p className="mt-2 text-xs text-red-600">Erro: {job.error}</p>
+                    )}
+                    {job.changedFiles && job.changedFiles.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-xs font-semibold text-slate-600 dark:text-slate-200">Arquivos alterados</p>
+                        <ul className="mt-1 space-y-1 text-xs text-slate-700 dark:text-slate-300">
+                          {job.changedFiles.map((filePath) => (
+                            <li key={filePath} className="rounded bg-slate-100 px-2 py-1 dark:bg-slate-800">
+                              {filePath}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {job.status === 'COMPLETED' && (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {job.resultZipBase64 ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadZip(job)}
+                            className="inline-flex items-center justify-center rounded-md border border-emerald-600 px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-400 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
+                          >
+                            Baixar ZIP com fontes atualizados
+                          </button>
+                        ) : job.resultZipReady ? (
+                          <p className="text-xs text-slate-500 dark:text-slate-400">ZIP pronto — abra os detalhes para baixar novamente.</p>
+                        ) : (
+                          <p className="text-xs text-slate-500 dark:text-slate-400">ZIP ainda está sendo gerado.</p>
+                        )}
+                      </div>
+                    )}
+                    {job.patch && job.patch.trim() && (
+                      <details className="mt-3">
+                        <summary className="cursor-pointer text-xs font-semibold text-emerald-700">Ver patch</summary>
+                        <pre className="mt-2 max-h-64 overflow-auto rounded bg-slate-900/90 p-3 text-[11px] text-emerald-100">
+                          {job.patch}
+                        </pre>
+                      </details>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
-          <div className="space-y-4">
-            {jobs.map((job) => (
-              <div key={job.jobId} className="rounded border border-slate-200 dark:border-slate-800 p-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold">{job.title ?? 'Sem título'}</p>
-                    <p className="text-xs text-slate-500">
-                      ID: {job.jobId} • Status: {job.status}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => refreshJob(job.jobId)}
-                    className="text-xs text-emerald-700 hover:underline disabled:opacity-50"
-                  >
-                    Atualizar
-                  </button>
-                </div>
-                {job.summary && (
-                  <div className="mt-2">
-                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-200">Resumo</p>
-                    <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{job.summary}</p>
-                  </div>
-                )}
-                {job.error && (
-                  <p className="mt-2 text-xs text-red-600">Erro: {job.error}</p>
-                )}
-                {job.changedFiles && job.changedFiles.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-200">Arquivos alterados</p>
-                    <ul className="mt-1 space-y-1 text-xs text-slate-700 dark:text-slate-300">
-                      {job.changedFiles.map((filePath) => (
-                        <li key={filePath} className="rounded bg-slate-100 px-2 py-1 dark:bg-slate-800">
-                          {filePath}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {job.status === 'COMPLETED' && job.resultZipBase64 && (
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadZip(job)}
-                    className="mt-3 inline-flex items-center justify-center rounded-md border border-emerald-600 px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-400 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
-                  >
-                    Baixar ZIP com fontes atualizados
-                  </button>
-                )}
-                {job.patch && job.patch.trim() && (
-                  <details className="mt-3">
-                    <summary className="cursor-pointer text-xs font-semibold text-emerald-700">Ver patch</summary>
-                    <pre className="mt-2 max-h-64 overflow-auto rounded bg-slate-900/90 p-3 text-[11px] text-emerald-100">
-                      {job.patch}
-                    </pre>
-                  </details>
-                )}
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     </section>
