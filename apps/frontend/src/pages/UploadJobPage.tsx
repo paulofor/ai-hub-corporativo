@@ -14,6 +14,7 @@ interface UploadJob {
   patch?: string;
   resultZipBase64?: string;
   resultZipFilename?: string;
+  title?: string;
 }
 
 interface CodexModelOption {
@@ -23,6 +24,14 @@ interface CodexModelOption {
 }
 
 const ownerHeaders = { 'X-Role': 'owner', 'X-User': 'ui-owner' };
+const storedJobsKey = 'aihub.uploadJobs';
+const maxStoredJobs = 10;
+const maxTitleLength = 20;
+
+interface StoredJob {
+  jobId: string;
+  title: string;
+}
 
 const parseJob = (payload: unknown): UploadJob => {
   const data = (payload ?? {}) as Record<string, unknown>;
@@ -54,6 +63,48 @@ const parseJob = (payload: unknown): UploadJob => {
   };
 };
 
+const buildJobTitle = (task: string) => {
+  const normalized = task.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return 'Sem título';
+  }
+  if (normalized.length <= maxTitleLength) {
+    return normalized;
+  }
+  return normalized.slice(0, maxTitleLength).trimEnd();
+};
+
+const readStoredJobs = (): StoredJob[] => {
+  try {
+    const raw = localStorage.getItem(storedJobsKey);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw) as StoredJob[];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .filter((item) => item && typeof item.jobId === 'string' && typeof item.title === 'string')
+      .slice(0, maxStoredJobs);
+  } catch (err) {
+    console.warn('Falha ao carregar jobs salvos', err);
+    return [];
+  }
+};
+
+const writeStoredJobs = (jobs: UploadJob[]) => {
+  const payload: StoredJob[] = jobs
+    .filter((job) => job.jobId && job.title)
+    .map((job) => ({ jobId: job.jobId, title: job.title ?? 'Sem título' }))
+    .slice(0, maxStoredJobs);
+  try {
+    localStorage.setItem(storedJobsKey, JSON.stringify(payload));
+  } catch (err) {
+    console.warn('Falha ao salvar jobs', err);
+  }
+};
+
 export default function UploadJobPage() {
   const { pushToast } = useToasts();
   const [taskDescription, setTaskDescription] = useState('');
@@ -66,6 +117,36 @@ export default function UploadJobPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modelOptions, setModelOptions] = useState<CodexModelOption[]>([]);
+  const [jobsLoaded, setJobsLoaded] = useState(false);
+
+  useEffect(() => {
+    const stored = readStoredJobs();
+    if (stored.length > 0) {
+      setJobs(
+        stored.map((job) => ({
+          jobId: job.jobId,
+          title: job.title,
+          status: 'PENDING'
+        }))
+      );
+      stored.forEach((job) => {
+        client
+          .get(`/upload-jobs/${job.jobId}`)
+          .then((response) => {
+            const parsed = parseJob(response.data);
+            setJobs((current) =>
+              current.map((item) =>
+                item.jobId === job.jobId ? { ...parsed, title: item.title ?? job.title } : item
+              )
+            );
+          })
+          .catch((err: Error) => {
+            console.warn(`Falha ao atualizar job ${job.jobId}`, err);
+          });
+      });
+    }
+    setJobsLoaded(true);
+  }, []);
 
   useEffect(() => {
     client
@@ -81,6 +162,17 @@ export default function UploadJobPage() {
       })
       .catch((err: Error) => setError(err.message));
   }, []);
+
+  useEffect(() => {
+    if (!jobsLoaded) {
+      return;
+    }
+    if (jobs.length === 0) {
+      writeStoredJobs([]);
+      return;
+    }
+    writeStoredJobs(jobs);
+  }, [jobs, jobsLoaded]);
 
   const handleProblemFilesChange = (event: ChangeEvent<HTMLInputElement>) => {
     const selection = event.target.files ? Array.from(event.target.files) : [];
@@ -123,7 +215,12 @@ export default function UploadJobPage() {
         headers: { 'Content-Type': 'multipart/form-data', ...ownerHeaders }
       });
       const parsed = parseJob(response.data);
-      setJobs((current) => [parsed, ...current.filter((item) => item.jobId !== parsed.jobId)]);
+      const title = buildJobTitle(trimmedTask);
+      const enriched = { ...parsed, title };
+      setJobs((current) => [
+        enriched,
+        ...current.filter((item) => item.jobId !== parsed.jobId)
+      ].slice(0, maxStoredJobs));
       setTaskDescription('');
       setTestCommand('');
       setFile(null);
@@ -140,7 +237,9 @@ export default function UploadJobPage() {
   const refreshJob = async (jobId: string) => {
     const response = await client.get(`/upload-jobs/${jobId}`);
     const parsed = parseJob(response.data);
-    setJobs((current) => current.map((job) => (job.jobId === jobId ? parsed : job)));
+    setJobs((current) =>
+      current.map((job) => (job.jobId === jobId ? { ...parsed, title: job.title } : job))
+    );
   };
 
   const handleDownloadZip = (job: UploadJob) => {
@@ -319,15 +418,17 @@ export default function UploadJobPage() {
         <div className="rounded-xl border border-slate-200 bg-white/70 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
           <h3 className="text-lg font-semibold mb-3">Jobs enviados</h3>
           {jobs.length === 0 && (
-            <p className="text-sm text-slate-500">Nenhum job criado nesta sessão.</p>
+            <p className="text-sm text-slate-500">Nenhum job criado recentemente.</p>
           )}
           <div className="space-y-4">
             {jobs.map((job) => (
               <div key={job.jobId} className="rounded border border-slate-200 dark:border-slate-800 p-3 text-sm">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-semibold">{job.jobId}</p>
-                    <p className="text-xs text-slate-500">Status: {job.status}</p>
+                    <p className="font-semibold">{job.title ?? 'Sem título'}</p>
+                    <p className="text-xs text-slate-500">
+                      ID: {job.jobId} • Status: {job.status}
+                    </p>
                   </div>
                   <button
                     onClick={() => refreshJob(job.jobId)}
