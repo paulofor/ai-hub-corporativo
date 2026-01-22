@@ -16,6 +16,19 @@ interface ApiKeyResolution {
   candidates: string[];
 }
 
+function logVolumeMappings() {
+  const tokenHostDir = validateString(process.env.OPENAI_TOKEN_HOST_DIR) ?? '/root/infra/openai-token';
+  const tokenContainerDir = '/run/secrets/openai-token';
+  const sandboxWorkdir = validateString(process.env.SANDBOX_WORKDIR) ?? '/root/ai-hub-corporativo/src';
+
+  console.log(
+    `Sandbox orchestrator: mapeamento OPENAI_TOKEN_HOST_DIR ${tokenHostDir} (host) -> ${tokenContainerDir} (container)`,
+  );
+  console.log(
+    `Sandbox orchestrator: mapeamento SANDBOX_WORKDIR ${sandboxWorkdir} (host) -> ${sandboxWorkdir} (container)`,
+  );
+}
+
 function validateString(value: unknown): string | undefined {
   if (typeof value !== 'string') {
     return undefined;
@@ -45,6 +58,7 @@ function resolveOpenAiApiKey(): ApiKeyResolution {
 
   const envKey = validateString(process.env.OPENAI_API_KEY);
   if (envKey) {
+    console.log('Sandbox orchestrator: OPENAI_API_KEY encontrada no ambiente (OPENAI_API_KEY).');
     return { key: envKey, candidates };
   }
 
@@ -55,6 +69,19 @@ function resolveOpenAiApiKey(): ApiKeyResolution {
     '/root/infra/openai-token/openai_api_key',
     '/root/infra/openai-token/open_api_key',
   ].filter(Boolean) as string[];
+
+  if (fileCandidates.length) {
+    const directories = Array.from(
+      new Set(fileCandidates.map((candidate) => candidate.split('/').slice(0, -1).join('/'))),
+    );
+    console.log(
+      `Sandbox orchestrator: buscando OPENAI_API_KEY nos arquivos: ${fileCandidates.join(', ')} (diretórios: ${directories.join(
+        ', ',
+      )})`,
+    );
+  } else {
+    console.log('Sandbox orchestrator: nenhum caminho configurado para buscar OPENAI_API_KEY em arquivo.');
+  }
 
   for (const candidate of fileCandidates) {
     candidates.push(candidate);
@@ -90,6 +117,7 @@ function parseProblemFiles(raw: unknown): UploadedProblemFile[] {
 
 export function createApp(options: AppOptions = {}) {
   const jobRegistry = options.jobRegistry ?? new Map<string, SandboxJob>();
+  logVolumeMappings();
   const { key: apiKey, candidates: keyCandidates } = resolveOpenAiApiKey();
   if (!apiKey) {
     const candidatesLabel = keyCandidates.length ? keyCandidates.join(', ') : '<nenhum caminho verificado>';
