@@ -3,31 +3,20 @@ import { Link, useParams } from 'react-router-dom';
 import client from '../api/client';
 import { useToasts } from '../components/ToastContext';
 import {
+  buildJobTitle,
   downloadUploadJobZip,
   getUploadJobStatusClassName,
   parseUploadJob,
-  readStoredJobs,
   resolveUploadJobTitle,
-  writeStoredJobs,
   UploadJob
 } from '../utils/uploadJobs';
 
 export default function UploadJobDetailPage() {
   const { jobId } = useParams<{ jobId: string }>();
   const { pushToast } = useToasts();
-  const [job, setJob] = useState<UploadJob | null>(() => {
-    if (!jobId) {
-      return null;
-    }
-    return readStoredJobs().find((item) => item.jobId === jobId) ?? null;
-  });
+  const [job, setJob] = useState<UploadJob | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const persistJobSnapshot = useCallback((updatedJob: UploadJob) => {
-    const existing = readStoredJobs().filter((item) => item.jobId !== updatedJob.jobId);
-    writeStoredJobs([updatedJob, ...existing]);
-  }, []);
 
   const loadJob = useCallback(async () => {
     if (!jobId) {
@@ -36,7 +25,7 @@ export default function UploadJobDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await client.get(`/upload-jobs/${jobId}`);
+      const response = await client.get(`/upload-jobs/${jobId}?refresh=true`);
       if (!response.data) {
         setError('Job não encontrado no sandbox.');
         setJob(null);
@@ -49,9 +38,13 @@ export default function UploadJobDetailPage() {
           ...(current ?? { jobId: resolvedJobId, status: parsed.status }),
           ...parsed,
           jobId: resolvedJobId,
-          title: resolveUploadJobTitle(resolvedJobId, current?.title, parsed.title)
+          title: resolveUploadJobTitle(
+            resolvedJobId,
+            current?.title,
+            parsed.title,
+            parsed.taskDescription ? buildJobTitle(parsed.taskDescription) : undefined
+          )
         };
-        persistJobSnapshot(nextJob);
         return nextJob;
       });
     } catch (err) {
@@ -59,7 +52,7 @@ export default function UploadJobDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [jobId, persistJobSnapshot]);
+  }, [jobId]);
 
   useEffect(() => {
     if (!jobId) {
@@ -90,8 +83,13 @@ export default function UploadJobDetailPage() {
   const formatNumber = (value?: number) => (value != null ? value.toLocaleString('pt-BR') : '—');
   const formatCost = (value?: number) => (value != null ? currencyFormatter.format(value) : '—');
 
-  const displayTitle = resolveUploadJobTitle(jobId ?? '', job?.title);
-  const lastUpdatedLabel = job?.lastSyncedAt ? new Date(job.lastSyncedAt).toLocaleString() : null;
+  const displayTitle = resolveUploadJobTitle(
+    jobId ?? '',
+    job?.title,
+    job?.taskDescription ? buildJobTitle(job.taskDescription) : undefined
+  );
+  const updatedAt = job?.updatedAt ?? job?.lastSyncedAt;
+  const lastUpdatedLabel = updatedAt ? new Date(updatedAt).toLocaleString() : null;
   const zipReady = Boolean(job?.resultZipBase64);
 
   const zipStatusMessage = (() => {

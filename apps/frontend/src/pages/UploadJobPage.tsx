@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import client from '../api/client';
 import { useToasts } from '../components/ToastContext';
@@ -6,11 +6,8 @@ import {
   buildJobTitle,
   downloadUploadJobZip,
   getUploadJobStatusClassName,
-  MAX_STORED_UPLOAD_JOBS,
   parseUploadJob,
-  readStoredJobs,
   resolveUploadJobTitle,
-  writeStoredJobs,
   UploadJob
 } from '../utils/uploadJobs';
 
@@ -33,48 +30,41 @@ export default function UploadJobPage() {
   const [model, setModel] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [problemFiles, setProblemFiles] = useState<File[]>([]);
-  const [jobs, setJobs] = useState<UploadJob[]>(() => readStoredJobs());
+  const [jobs, setJobs] = useState<UploadJob[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modelOptions, setModelOptions] = useState<CodexModelOption[]>([]);
   const [jobsLoaded, setJobsLoaded] = useState(false);
+  const [jobsError, setJobsError] = useState<string | null>(null);
+
+  const loadJobs = useCallback(async () => {
+    try {
+      setJobsLoaded(false);
+      const response = await client.get('/upload-jobs');
+      const parsed = Array.isArray(response.data)
+        ? response.data.map((item: unknown) => parseUploadJob(item))
+        : [];
+      setJobs(
+        parsed.map((job) => ({
+          ...job,
+          title: resolveUploadJobTitle(
+            job.jobId,
+            job.title,
+            job.taskDescription ? buildJobTitle(job.taskDescription) : undefined
+          )
+        }))
+      );
+      setJobsError(null);
+    } catch (err) {
+      setJobsError((err as Error).message);
+    } finally {
+      setJobsLoaded(true);
+    }
+  }, []);
 
   useEffect(() => {
-    const storedJobs = readStoredJobs();
-    if (storedJobs.length === 0) {
-      setJobsLoaded(true);
-      return;
-    }
-
-    storedJobs.forEach((job) => {
-      client
-        .get(`/upload-jobs/${job.jobId}`)
-        .then((response) => {
-          if (!response.data) {
-            return;
-          }
-          const parsed = parseUploadJob(response.data);
-          const responseJobId = parsed.jobId || job.jobId;
-          setJobs((current) =>
-            current.map((item) =>
-              item.jobId === job.jobId
-                ? {
-                    ...item,
-                    ...parsed,
-                    jobId: responseJobId,
-                    title: resolveUploadJobTitle(responseJobId, item.title, parsed.title, job.title)
-                  }
-                : item
-            )
-          );
-        })
-        .catch((err: Error) => {
-          console.warn(`Falha ao atualizar job ${job.jobId}`, err);
-        });
-    });
-
-    setJobsLoaded(true);
-  }, []);
+    loadJobs();
+  }, [loadJobs]);
 
   useEffect(() => {
     client
@@ -90,17 +80,6 @@ export default function UploadJobPage() {
       })
       .catch((err: Error) => setError(err.message));
   }, []);
-
-  useEffect(() => {
-    if (!jobsLoaded) {
-      return;
-    }
-    if (jobs.length === 0) {
-      writeStoredJobs([]);
-      return;
-    }
-    writeStoredJobs(jobs);
-  }, [jobs, jobsLoaded]);
 
   const handleProblemFilesChange = (event: ChangeEvent<HTMLInputElement>) => {
     const selection = event.target.files ? Array.from(event.target.files) : [];
@@ -148,7 +127,7 @@ export default function UploadJobPage() {
       setJobs((current) => [
         enriched,
         ...current.filter((item) => item.jobId !== parsed.jobId)
-      ].slice(0, MAX_STORED_UPLOAD_JOBS));
+      ]);
       setTaskDescription('');
       setTestCommand('');
       setFile(null);
@@ -164,7 +143,7 @@ export default function UploadJobPage() {
 
   const refreshJob = async (jobId: string) => {
     try {
-      const response = await client.get(`/upload-jobs/${jobId}`);
+      const response = await client.get(`/upload-jobs/${jobId}?refresh=true`);
       if (!response.data) {
         pushToast('Job não encontrado no sandbox.');
         return;
@@ -178,7 +157,12 @@ export default function UploadJobPage() {
                 ...job,
                 ...parsed,
                 jobId: responseJobId,
-                title: resolveUploadJobTitle(responseJobId, job.title, parsed.title)
+                title: resolveUploadJobTitle(
+                  responseJobId,
+                  job.title,
+                  parsed.title,
+                  parsed.taskDescription ? buildJobTitle(parsed.taskDescription) : undefined
+                )
               }
             : job
         )
@@ -347,15 +331,21 @@ export default function UploadJobPage() {
         <div className="rounded-xl border border-slate-200 bg-white/70 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
           <h3 className="text-lg font-semibold mb-2">Jobs enviados</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-            Guardamos os últimos {MAX_STORED_UPLOAD_JOBS} jobs no seu navegador. Eles reaparecem aqui quando você voltar para acompanhar o progresso.
+            Listamos aqui os jobs enviados (armazenados no servidor), para você acompanhar de qualquer lugar.
           </p>
-          {jobs.length === 0 ? (
+          {jobsError && (
+            <p className="mb-3 text-sm text-rose-600">{jobsError}</p>
+          )}
+          {!jobsLoaded ? (
+            <p className="text-sm text-slate-500">Carregando lista de jobs...</p>
+          ) : jobs.length === 0 ? (
             <p className="text-sm text-slate-500">Nenhum job criado recentemente.</p>
           ) : (
             <div className="space-y-4">
               {jobs.map((job) => {
-                const title = resolveUploadJobTitle(job.jobId, job.title);
-                const lastUpdatedLabel = job.lastSyncedAt ? new Date(job.lastSyncedAt).toLocaleString() : null;
+                const title = resolveUploadJobTitle(job.jobId, job.title, job.taskDescription ? buildJobTitle(job.taskDescription) : undefined);
+                const updatedAt = job.updatedAt ?? job.lastSyncedAt;
+                const lastUpdatedLabel = updatedAt ? new Date(updatedAt).toLocaleString() : null;
                 return (
                   <div key={job.jobId} className="rounded border border-slate-200 dark:border-slate-800 p-3 text-sm">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
