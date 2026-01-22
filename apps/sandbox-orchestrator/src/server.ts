@@ -11,6 +11,11 @@ interface AppOptions {
   processor?: JobProcessor;
 }
 
+interface ApiKeyResolution {
+  key?: string;
+  candidates: string[];
+}
+
 function validateString(value: unknown): string | undefined {
   if (typeof value !== 'string') {
     return undefined;
@@ -35,13 +40,15 @@ function readKeyFile(path?: string): string | undefined {
   }
 }
 
-function resolveOpenAiApiKey(): string | undefined {
+function resolveOpenAiApiKey(): ApiKeyResolution {
+  const candidates: string[] = [];
+
   const envKey = validateString(process.env.OPENAI_API_KEY);
   if (envKey) {
-    return envKey;
+    return { key: envKey, candidates };
   }
 
-  const candidates = [
+  const fileCandidates = [
     validateString(process.env.OPENAI_API_KEY_FILE),
     '/run/secrets/openai-token/openai_api_key',
     '/run/secrets/openai-token/open_api_key',
@@ -49,15 +56,16 @@ function resolveOpenAiApiKey(): string | undefined {
     '/root/infra/openai-token/open_api_key',
   ].filter(Boolean) as string[];
 
-  for (const candidate of candidates) {
+  for (const candidate of fileCandidates) {
+    candidates.push(candidate);
     const key = readKeyFile(candidate);
     if (key) {
       console.log(`Sandbox orchestrator: OPENAI_API_KEY carregada do arquivo ${candidate}`);
-      return key;
+      return { key, candidates };
     }
   }
 
-  return undefined;
+  return { candidates };
 }
 
 function parseProblemFiles(raw: unknown): UploadedProblemFile[] {
@@ -82,9 +90,12 @@ function parseProblemFiles(raw: unknown): UploadedProblemFile[] {
 
 export function createApp(options: AppOptions = {}) {
   const jobRegistry = options.jobRegistry ?? new Map<string, SandboxJob>();
-  const apiKey = resolveOpenAiApiKey();
+  const { key: apiKey, candidates: keyCandidates } = resolveOpenAiApiKey();
   if (!apiKey) {
-    console.warn('Sandbox orchestrator: OPENAI_API_KEY não configurada; os jobs não conseguirão chamar o modelo.');
+    const candidatesLabel = keyCandidates.length ? keyCandidates.join(', ') : '<nenhum caminho verificado>';
+    console.warn(
+      `Sandbox orchestrator: OPENAI_API_KEY não configurada; os jobs não conseguirão chamar o modelo (caminhos verificados: ${candidatesLabel}).`,
+    );
   }
   const processor = options.processor ?? new SandboxJobProcessor(apiKey, process.env.CIFIX_MODEL);
 
