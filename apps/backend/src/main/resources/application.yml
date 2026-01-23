@@ -13,6 +13,15 @@ spring:
     hikari:
       initialization-fail-timeout: 0
       connection-timeout: 60000
+      data-source-properties:
+        # O banco MySQL exposto em d555d.vps-kinghost.net usa um certificado
+        # não confiável para TLS. Definimos o sslMode como REQUIRED por padrão
+        # para manter a conexão criptografada sem exigir verificação do
+        # certificado (evitando falhas de handshake). Ajuste DB_SSL_MODE para
+        # VERIFY_CA/VERIFY_IDENTITY caso tenha um certificado confiável
+        # configurado no servidor de banco.
+        sslMode: ${DB_SSL_MODE:REQUIRED}
+        allowPublicKeyRetrieval: ${DB_ALLOW_PUBLIC_KEY_RETRIEVAL:true}
   jpa:
     hibernate:
       ddl-auto: validate
