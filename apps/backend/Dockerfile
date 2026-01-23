@@ -16,6 +16,11 @@ RUN mvn -B -DskipTests package
 
 FROM eclipse-temurin:21-jre AS runtime
 WORKDIR /app
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends curl \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=build /workspace/target/hub-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8081
+HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
+  CMD curl -fsS http://localhost:8081/actuator/health || exit 1
 ENTRYPOINT ["java", "-jar", "app.jar"]
