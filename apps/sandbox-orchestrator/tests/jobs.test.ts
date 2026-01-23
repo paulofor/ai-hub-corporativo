@@ -132,6 +132,50 @@ test('accepts upload jobs larger than the default JSON limit', async () => {
   assert.ok(storedBase64!.length >= largeBase64.length);
 });
 
+test('materializa credenciais do GCP no sandbox e exporta variáveis para run_shell', async () => {
+  const workspace = await fs.mkdtemp(path.join(os.tmpdir(), 'sandbox-gcp-creds-'));
+  const repoPath = path.join(workspace, 'repo');
+  await fs.mkdir(repoPath, { recursive: true });
+
+  const processor = new SandboxJobProcessor();
+  const credentialContent = '{"type":"service_account","project_id":"demo"}';
+  const job: SandboxJob = {
+    jobId: 'job-gcp-creds',
+    repoUrl: 'upload://job-gcp-creds',
+    branch: 'upload',
+    taskDescription: 'noop',
+    status: 'PENDING',
+    logs: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    sandboxPath: workspace,
+    applicationDefaultCredentials: {
+      base64: Buffer.from(credentialContent).toString('base64'),
+      filename: 'application_default_credentials.json',
+    },
+  } as SandboxJob;
+
+  await (processor as any).materializeApplicationDefaultCredentials(job);
+
+  const expectedPath = path.join(workspace, '.config', 'gcloud', 'application_default_credentials.json');
+  const saved = await fs.readFile(expectedPath, 'utf-8');
+  assert.equal(saved, credentialContent);
+  assert.equal(job.gcpCredentialsPath, expectedPath);
+
+  const result = await (processor as any).handleRunShell(
+    { command: ['sh', '-c', 'echo $HOME && echo $GOOGLE_APPLICATION_CREDENTIALS && echo $CLOUDSDK_CONFIG'], cwd: '.' },
+    repoPath,
+    job,
+  );
+
+  const [homeEnv, credentialsEnv, cloudConfigEnv] = result.stdout.trim().split('\n');
+  assert.equal(homeEnv, workspace);
+  assert.equal(credentialsEnv, expectedPath);
+  assert.equal(cloudConfigEnv, path.dirname(expectedPath));
+
+  await fs.rm(workspace, { recursive: true, force: true });
+});
+
 test('respects SANDBOX_WORKDIR when creating workspaces', async () => {
   const originalWorkdir = process.env.SANDBOX_WORKDIR;
   const customBase = await fs.mkdtemp(path.join(os.tmpdir(), 'sandbox-custom-base-'));

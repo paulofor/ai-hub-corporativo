@@ -12,6 +12,12 @@ export interface UploadedProblemFile {
   contentType?: string;
 }
 
+export interface UploadedApplicationDefaultCredential {
+  base64: string;
+  filename?: string;
+  contentType?: string;
+}
+
 export interface SandboxJob {
   jobId: string;
   repoSlug?: string;
@@ -23,6 +29,7 @@ export interface SandboxJob {
   profile?: SandboxProfile;
   model?: string;
   uploadedZip?: UploadedZip;
+  applicationDefaultCredentials?: UploadedApplicationDefaultCredential;
   problemFiles?: UploadedProblemFile[];
   status: JobStatus;
   summary?: string;
@@ -31,6 +38,7 @@ export interface SandboxJob {
   pullRequestUrl?: string;
   error?: string;
   sandboxPath?: string;
+  gcpCredentialsPath?: string;
   promptTokens?: number;
   completionTokens?: number;
   totalTokens?: number;

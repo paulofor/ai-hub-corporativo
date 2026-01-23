@@ -12,6 +12,7 @@ public record SandboxUploadJobRequest(
     String model,
     String repoUrl,
     String branch,
-    List<UploadedProblemFile> problemFiles
+    List<UploadedProblemFile> problemFiles,
+    UploadedApplicationDefaultCredential applicationDefaultCredentials
 ) {
 }

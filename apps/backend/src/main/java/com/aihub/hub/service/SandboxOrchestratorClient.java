@@ -85,6 +85,16 @@ public class SandboxOrchestratorClient {
                 body.put("problemFiles", problemFiles);
             }
         }
+        if (request.applicationDefaultCredentials() != null) {
+            Map<String, Object> credentials = new HashMap<>();
+            credentials.put("base64", request.applicationDefaultCredentials().base64());
+            Optional.ofNullable(request.applicationDefaultCredentials().filename())
+                .ifPresent(value -> credentials.put("filename", value));
+            Optional.ofNullable(request.applicationDefaultCredentials().contentType())
+                .ifPresent(value -> credentials.put("contentType", value));
+            body.put("applicationDefaultCredentials", credentials);
+        }
+
 
         log.info("Enviando job {} (upload) para sandbox-orchestrator no path {}", request.jobId(), jobsPath);
         JsonNode response = restClient.post()
