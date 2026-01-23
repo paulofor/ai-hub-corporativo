@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 import { SandboxJobProcessor } from './jobProcessor.js';
-import { JobProcessor, SandboxJob, SandboxProfile, UploadedProblemFile } from './types.js';
+import { JobProcessor, SandboxJob, SandboxProfile, UploadedApplicationDefaultCredential, UploadedProblemFile } from './types.js';
 
 interface AppOptions {
   jobRegistry?: Map<string, SandboxJob>;
@@ -115,6 +115,22 @@ function parseProblemFiles(raw: unknown): UploadedProblemFile[] {
   return files;
 }
 
+function parseApplicationDefaultCredentials(raw: unknown): UploadedApplicationDefaultCredential | undefined {
+  if (!raw || typeof raw !== 'object') {
+    return undefined;
+  }
+
+  const payload = raw as Record<string, unknown>;
+  const base64 = validateString(payload["base64"]);
+  if (!base64) {
+    return undefined;
+  }
+
+  const filename = validateString(payload["filename"]);
+  const contentType = validateString(payload["contentType"]);
+  return { base64, filename: filename ?? undefined, contentType: contentType ?? undefined };
+}
+
 export function createApp(options: AppOptions = {}) {
   const jobRegistry = options.jobRegistry ?? new Map<string, SandboxJob>();
   logVolumeMappings();
@@ -186,6 +202,7 @@ export function createApp(options: AppOptions = {}) {
       validateString(req.body?.zipName);
 
     const problemFiles = parseProblemFiles(req.body?.problemFiles);
+    const applicationDefaultCredentials = parseApplicationDefaultCredentials(req.body?.applicationDefaultCredentials);
 
     const isUpload = Boolean(uploadedZipBase64);
     const resolvedBranch = branch ?? (isUpload ? 'upload' : undefined);
@@ -224,6 +241,7 @@ export function createApp(options: AppOptions = {}) {
       profile,
       model: model ?? undefined,
       uploadedZip: isUpload ? { base64: uploadedZipBase64!, filename: uploadedZipName ?? undefined } : undefined,
+      applicationDefaultCredentials: applicationDefaultCredentials ?? undefined,
       problemFiles: problemFiles.length ? problemFiles : undefined,
       status: 'PENDING',
       logs: [],

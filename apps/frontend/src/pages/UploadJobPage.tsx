@@ -30,6 +30,7 @@ export default function UploadJobPage() {
   const [model, setModel] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [problemFiles, setProblemFiles] = useState<File[]>([]);
+  const [gcpCredentials, setGcpCredentials] = useState<File | null>(null);
   const [jobs, setJobs] = useState<UploadJob[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,6 +117,9 @@ export default function UploadJobPage() {
     problemFiles.forEach((problemFile) => {
       formData.append('problemFiles', problemFile);
     });
+    if (gcpCredentials) {
+      formData.append('applicationDefaultCredentials', gcpCredentials);
+    }
 
     try {
       const response = await client.post('/upload-jobs', formData, {
@@ -133,6 +137,7 @@ export default function UploadJobPage() {
       setFile(null);
       setModel('');
       setProblemFiles([]);
+      setGcpCredentials(null);
       pushToast('Job criado e enviado para o sandbox.');
     } catch (err) {
       setError((err as Error).message);
@@ -243,6 +248,34 @@ export default function UploadJobPage() {
                   </li>
                 ))}
               </ul>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Credenciais do GCP (application_default_credentials.json)</label>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Opcional: envie o arquivo de credenciais para ficarem disponíveis em ~/.config/gcloud/ do sandbox.
+              Isso permite que builds Maven acessem bibliotecas do GCP usando essas credenciais.
+            </p>
+            <input
+              type="file"
+              accept="application/json,.json"
+              onChange={(event) => setGcpCredentials(event.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-emerald-100 file:px-3 file:py-2 file:text-emerald-700 hover:file:bg-emerald-200 dark:text-slate-200 dark:file:bg-emerald-900/40 dark:file:text-emerald-100"
+            />
+            {gcpCredentials && (
+              <div className="flex items-center justify-between rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                <span className="truncate pr-3" title={gcpCredentials.name}>
+                  Selecionado: {gcpCredentials.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setGcpCredentials(null)}
+                  className="text-[11px] font-semibold text-emerald-700 hover:underline"
+                >
+                  Remover
+                </button>
+              </div>
             )}
           </div>
 

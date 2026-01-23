@@ -47,6 +47,8 @@ public class SandboxUploadService {
         }
 
         List<UploadedProblemFile> problemFiles = resolveProblemFiles(request.getProblemFiles());
+        UploadedApplicationDefaultCredential applicationDefaultCredentials =
+            resolveApplicationDefaultCredentials(request.getApplicationDefaultCredentials());
 
         SandboxUploadJobRequest payload = new SandboxUploadJobRequest(
             jobId,
@@ -58,7 +60,8 @@ public class SandboxUploadService {
             request.getModel(),
             "upload://" + jobId,
             "upload",
-            problemFiles
+            problemFiles,
+            applicationDefaultCredentials
         );
 
         UploadJobRecord record = new UploadJobRecord();
@@ -134,6 +137,26 @@ public class SandboxUploadService {
         Optional.ofNullable(payload.cost()).ifPresent(record::setCost);
         if (payload.changedFiles() != null && !payload.changedFiles().isEmpty()) {
             record.setChangedFiles(String.join("\n", payload.changedFiles()));
+        }
+    }
+
+    private UploadedApplicationDefaultCredential resolveApplicationDefaultCredentials(MultipartFile credentialFile) {
+        if (credentialFile == null || credentialFile.isEmpty()) {
+            return null;
+        }
+
+        String filename = Optional.ofNullable(credentialFile.getOriginalFilename())
+            .filter(name -> !name.isBlank())
+            .orElse("application_default_credentials.json");
+
+        try {
+            return new UploadedApplicationDefaultCredential(
+                filename,
+                Base64.getEncoder().encodeToString(credentialFile.getBytes()),
+                credentialFile.getContentType()
+            );
+        } catch (IOException e) {
+            throw new IllegalStateException("Falha ao ler o arquivo de credenciais GCP enviado", e);
         }
     }
 

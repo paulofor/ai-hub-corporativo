@@ -22,6 +22,8 @@ public class CreateUploadJobRequest {
 
     private List<MultipartFile> problemFiles;
 
+    private MultipartFile applicationDefaultCredentials;
+
     public String getTaskDescription() {
         return taskDescription;
     }
@@ -68,5 +70,13 @@ public class CreateUploadJobRequest {
 
     public void setProblemFiles(List<MultipartFile> problemFiles) {
         this.problemFiles = problemFiles;
+    }
+
+    public MultipartFile getApplicationDefaultCredentials() {
+        return applicationDefaultCredentials;
+    }
+
+    public void setApplicationDefaultCredentials(MultipartFile applicationDefaultCredentials) {
+        this.applicationDefaultCredentials = applicationDefaultCredentials;
     }
 }

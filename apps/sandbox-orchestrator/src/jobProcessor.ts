@@ -118,6 +118,8 @@ export class SandboxJobProcessor implements JobProcessor {
     }
 
     try {
+      await this.materializeApplicationDefaultCredentials(job);
+
       const isUpload = this.isUploadJob(job);
       let baseCommit: string | undefined;
       let githubAuth: { token?: string; username: string; source: string } | undefined;
@@ -199,6 +201,53 @@ export class SandboxJobProcessor implements JobProcessor {
         `falha ao criar workspace temporário em ${baseDir}: ${message} (status do diretório base: ${baseDirStatus})`,
       );
       throw new Error(`não foi possível criar workspace temporário em ${baseDir}: ${message}`);
+    }
+  }
+
+  private resolveHomeDir(job: SandboxJob): string {
+    if (job.sandboxPath && job.sandboxPath.trim()) {
+      return job.sandboxPath;
+    }
+    return process.env.HOME ?? os.homedir();
+  }
+
+  private sanitizeCredentialFilename(name: string | undefined): string {
+    const fallback = 'application_default_credentials.json';
+    if (!name) {
+      return fallback;
+    }
+    const normalized = path.basename(name.trim());
+    if (!normalized || normalized === '.' || normalized === '..') {
+      return fallback;
+    }
+    return normalized;
+  }
+
+  private async materializeApplicationDefaultCredentials(job: SandboxJob): Promise<void> {
+    const credentials = job.applicationDefaultCredentials;
+    if (!credentials?.base64) {
+      return;
+    }
+
+    const homeDir = this.resolveHomeDir(job);
+    const targetDir = path.join(homeDir, '.config', 'gcloud');
+    const filename = this.sanitizeCredentialFilename(credentials.filename);
+    let buffer: Buffer;
+    try {
+      buffer = Buffer.from(credentials.base64, 'base64');
+    } catch {
+      throw new Error('arquivo de credenciais GCP inválido (base64)');
+    }
+
+    try {
+      await fs.mkdir(targetDir, { recursive: true });
+      const destination = path.join(targetDir, filename);
+      await fs.writeFile(destination, buffer, { mode: 0o600 });
+      job.gcpCredentialsPath = destination;
+      this.log(job, `arquivo de credenciais GCP salvo em ${destination}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`não foi possível salvar credenciais do GCP: ${message}`);
     }
   }
 
@@ -894,7 +943,17 @@ Modo econômico ativo: minimize leituras extensas, priorize comandos curtos, esc
     let stderrTruncated = false;
     let timedOut = false;
 
-    const child = spawn(command[0], command.slice(1), { cwd });
+    const homeDir = this.resolveHomeDir(job);
+    const env: NodeJS.ProcessEnv = { ...process.env, HOME: homeDir };
+    const credentialsPath = job.gcpCredentialsPath;
+    if (credentialsPath) {
+      env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
+      env.CLOUDSDK_CONFIG = path.dirname(credentialsPath);
+    } else if (homeDir) {
+      env.CLOUDSDK_CONFIG = path.join(homeDir, '.config', 'gcloud');
+    }
+
+    const child = spawn(command[0], command.slice(1), { cwd, env });
 
     const appendWithLimit = (current: string, chunk: string): { value: string; truncated: boolean } => {
       if (current.length >= maxBuffer) {
