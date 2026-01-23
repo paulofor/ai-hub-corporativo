@@ -3,6 +3,9 @@ spring:
     multipart:
       max-file-size: 500MB
       max-request-size: 500MB
+  jackson:
+    parser:
+      max-string-length: 50000000
   datasource:
     url: ${DB_URL:jdbc:h2:mem:hub;MODE=MySQL;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=VALUE}
     username: ${DB_USER:sa}
