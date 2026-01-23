@@ -20,6 +20,12 @@ services:
       - ${OPENAI_TOKEN_HOST_DIR:-/root/infra/openai-token}:/run/secrets/openai-token:ro
     ports:
       - "${BACKEND_HTTP_PORT:-8081}:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
     networks:
       default:
         aliases:
@@ -76,7 +82,7 @@ services:
       frontend:
         condition: service_started
       backend:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "80:80"
       - "443:443"
