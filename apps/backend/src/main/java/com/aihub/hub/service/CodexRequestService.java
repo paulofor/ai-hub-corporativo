@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
 public class CodexRequestService {
 
     private static final Logger log = LoggerFactory.getLogger(CodexRequestService.class);
+    private static final String PERSONA_PREFIX = "Você é um especialista sênior em Java.\n\n";
 
     private final CodexRequestRepository codexRequestRepository;
     private final PromptRepository promptRepository;
@@ -62,11 +63,12 @@ public class CodexRequestService {
         CodexIntegrationProfile profile = resolveProfile(request.getProfile());
         String model = resolveModel(profile, request.getModel());
         log.info("Criando CodexRequest para ambiente {} com modelo {} (perfil {})", request.getEnvironment(), model, profile);
+        String resolvedPrompt = applyPersonaPrefix(request.getPrompt());
         CodexRequest codexRequest = new CodexRequest(
             request.getEnvironment().trim(),
             model,
             profile,
-            request.getPrompt().trim()
+            resolvedPrompt
         );
 
         codexRequest.setProfile(profile);
@@ -86,7 +88,7 @@ public class CodexRequestService {
             metadata.runId(),
             metadata.prNumber(),
             model,
-            request.getPrompt().trim()
+            resolvedPrompt
         );
         promptRepository.save(promptRecord);
 
@@ -167,6 +169,18 @@ public class CodexRequestService {
             return economyModel.trim();
         }
         return defaultModel;
+    }
+
+    private String applyPersonaPrefix(String prompt) {
+        if (!StringUtils.hasText(prompt)) {
+            return prompt;
+        }
+        String trimmedPrompt = prompt.trim();
+        String trimmedPrefix = PERSONA_PREFIX.trim();
+        if (trimmedPrompt.startsWith(trimmedPrefix)) {
+            return trimmedPrompt;
+        }
+        return PERSONA_PREFIX + trimmedPrompt;
     }
 
     private PromptMetadata extractMetadata(String environment) {
