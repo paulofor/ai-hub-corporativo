@@ -125,7 +125,7 @@ public class SandboxOrchestratorClient {
         return requestSpec.exchange((request, response) -> {
             HttpStatusCode status = response.getStatusCode();
             MediaType contentType = response.getHeaders().getContentType();
-            String body = response.bodyTo(String.class);
+            String body = response.body(String.class);
 
             if (allowNotFound && status.value() == 404) {
                 log.warn("Job não encontrado no sandbox-orchestrator (operação: {})", operationDescription);
@@ -147,13 +147,34 @@ public class SandboxOrchestratorClient {
                 throw new IllegalStateException("sandbox-orchestrator retornou " + status.value() + " com corpo vazio");
             }
 
-            try {
-                return objectMapper.readTree(body);
-            } catch (JsonProcessingException ex) {
+            if (!looksLikeJson(body)) {
                 logIfNeeded(status, contentType, body);
-                throw new IllegalStateException(buildErrorMessage(status, contentType), ex);
+                throw new IllegalStateException("sandbox-orchestrator retornou " + status.value()
+                    + " com corpo inválido (JSON esperado)");
             }
+
+            return readJsonTree(body, status, contentType);
         });
+    }
+
+    private JsonNode readJsonTree(String body, HttpStatusCode status, MediaType contentType) {
+        try {
+            return objectMapper.readTree(body);
+        } catch (JsonProcessingException ex) {
+            logIfNeeded(status, contentType, body);
+            throw new IllegalStateException("sandbox-orchestrator retornou " + status.value()
+                + " com corpo inválido (JSON esperado)", ex);
+        }
+    }
+
+    private boolean looksLikeJson(String body) {
+        String trimmed = body.trim();
+        if (trimmed.isEmpty()) {
+            return false;
+        }
+        char first = trimmed.charAt(0);
+        char last = trimmed.charAt(trimmed.length() - 1);
+        return (first == '{' && last == '}') || (first == '[' && last == ']');
     }
 
     private void logIfNeeded(HttpStatusCode status, MediaType contentType, String body) {
