@@ -9,9 +9,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StreamUtils;
 import org.springframework.web.client.RestClient;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -125,7 +128,7 @@ public class SandboxOrchestratorClient {
         return requestSpec.exchange((request, response) -> {
             HttpStatusCode status = response.getStatusCode();
             MediaType contentType = response.getHeaders().getContentType();
-            String body = response.body(String.class);
+            String body = readBody(response);
 
             if (allowNotFound && status.value() == 404) {
                 log.warn("Job não encontrado no sandbox-orchestrator (operação: {})", operationDescription);
@@ -155,6 +158,14 @@ public class SandboxOrchestratorClient {
 
             return readJsonTree(body, status, contentType);
         });
+    }
+
+    private String readBody(RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse response) {
+        try {
+            return StreamUtils.copyToString(response.getBody(), StandardCharsets.UTF_8);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Falha ao ler resposta do sandbox-orchestrator", ex);
+        }
     }
 
     private JsonNode readJsonTree(String body, HttpStatusCode status, MediaType contentType) {
