@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class JacksonConfig {
 
-    private static final int MAX_STRING_LENGTH = 50_000_000;
+    private static final int MAX_STRING_LENGTH = 200 * 1024 * 1024;
 
     @Bean
     public Jackson2ObjectMapperBuilderCustomizer streamReadConstraintsCustomizer() {
