@@ -19,6 +19,7 @@ spring:
         # configurado no servidor de banco.
         sslMode: ${DB_SSL_MODE:REQUIRED}
         allowPublicKeyRetrieval: ${DB_ALLOW_PUBLIC_KEY_RETRIEVAL:true}
+        maxAllowedPacket: ${DB_MAX_ALLOWED_PACKET:536870912}
   jpa:
     hibernate:
       ddl-auto: validate
