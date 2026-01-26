@@ -363,6 +363,7 @@ EOF
   DB_PASS="S3nh@Fort3"
   DB_SSL_MODE="REQUIRED"
   DB_ALLOW_PUBLIC_KEY_RETRIEVAL="true"
+  DB_MAX_ALLOWED_PACKET="536870912"
 
   echo
   echo "Para o GITHUB_PRIVATE_KEY_PEM você pode informar um caminho para o arquivo .pem."
@@ -432,6 +433,7 @@ create_env_file() {
     printf 'DB_PASS=%s\n' "${DB_PASS}"
     printf 'DB_SSL_MODE=%s\n' "${DB_SSL_MODE}"
     printf 'DB_ALLOW_PUBLIC_KEY_RETRIEVAL=%s\n' "${DB_ALLOW_PUBLIC_KEY_RETRIEVAL}"
+    printf 'DB_MAX_ALLOWED_PACKET=%s\n' "${DB_MAX_ALLOWED_PACKET}"
     printf 'HUB_PUBLIC_URL=%s\n' "${HUB_PUBLIC_URL}"
     printf 'VITE_API_BASE_URL=%s\n' "${VITE_API_BASE_URL}"
     printf 'FRONTEND_HTTP_PORT=%s\n' "${FRONTEND_HTTP_PORT}"

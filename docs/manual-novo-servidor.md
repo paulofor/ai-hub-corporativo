@@ -36,6 +36,7 @@ Durante o wizard:
 - Mantenha as portas padrão (backend 8081, frontend 8082, sandbox 8083) ou ajuste conforme necessidade.
 - O banco padrão continua em `jdbc:mysql://d555d.vps-kinghost.net:3306/aihubcorpdb` com `aihubcorp_usr` / `S3nh@Fort3`.
 - O host usa certificado TLS autoassinado; por isso deixamos `DB_SSL_MODE=REQUIRED` e `DB_ALLOW_PUBLIC_KEY_RETRIEVAL=true` como padrão para evitar erros de verificação do certificado. Ajuste `DB_SSL_MODE` para `VERIFY_CA`/`VERIFY_IDENTITY` se publicar o banco com um certificado confiável.
+- Para payloads grandes, garanta que o MySQL esteja com `max_allowed_packet` acima do tamanho esperado (ex.: `SET GLOBAL max_allowed_packet=512*1024*1024;`) e mantenha `DB_MAX_ALLOWED_PACKET` alinhado no `.env`.
 - Informe `GHCR_USERNAME`/`GHCR_TOKEN` se for baixar imagens privadas do GHCR.
 - Preencha as credenciais da GitHub App e demais variáveis conforme seu ambiente.
 
