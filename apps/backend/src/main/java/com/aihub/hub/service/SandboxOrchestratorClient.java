@@ -1,12 +1,14 @@
 package com.aihub.hub.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
@@ -19,15 +21,19 @@ import java.util.Optional;
 public class SandboxOrchestratorClient {
 
     private static final Logger log = LoggerFactory.getLogger(SandboxOrchestratorClient.class);
+    private static final int MAX_LOG_BODY_LENGTH = 2_000;
 
     private final RestClient restClient;
     private final String jobsPath;
+    private final ObjectMapper objectMapper;
 
     public SandboxOrchestratorClient(
         RestClient sandboxOrchestratorRestClient,
+        ObjectMapper objectMapper,
         @Value("${hub.sandbox.orchestrator.jobs-path:/jobs}") String jobsPath
     ) {
         this.restClient = sandboxOrchestratorRestClient;
+        this.objectMapper = objectMapper;
         this.jobsPath = jobsPath;
     }
 
@@ -44,12 +50,11 @@ public class SandboxOrchestratorClient {
         Optional.ofNullable(request.model()).ifPresent(value -> body.put("model", value));
 
         log.info("Enviando job {} para sandbox-orchestrator no path {}", request.jobId(), jobsPath);
-        JsonNode response = restClient.post()
+        JsonNode response = executeForJsonResponse(restClient.post()
             .uri(jobsPath)
             .contentType(MediaType.APPLICATION_JSON)
             .body(body)
-            .retrieve()
-            .body(JsonNode.class);
+            , "criar job", false);
 
         return SandboxOrchestratorJobResponse.from(response);
     }
@@ -97,28 +102,97 @@ public class SandboxOrchestratorClient {
 
 
         log.info("Enviando job {} (upload) para sandbox-orchestrator no path {}", request.jobId(), jobsPath);
-        JsonNode response = restClient.post()
+        JsonNode response = executeForJsonResponse(restClient.post()
             .uri(jobsPath)
             .contentType(MediaType.APPLICATION_JSON)
             .body(body)
-            .retrieve()
-            .body(JsonNode.class);
+            , "criar job upload", false);
 
         return SandboxOrchestratorJobResponse.from(response);
     }
 
     public SandboxOrchestratorJobResponse getJob(String jobId) {
         log.info("Consultando job {} no sandbox-orchestrator", jobId);
-        try {
-            JsonNode response = restClient.get()
-                .uri(jobsPath + "/" + jobId)
-                .retrieve()
-                .body(JsonNode.class);
-            return SandboxOrchestratorJobResponse.from(response);
-        } catch (HttpClientErrorException.NotFound ex) {
-            log.warn("Job {} não encontrado no sandbox-orchestrator", jobId);
-            return null;
+        JsonNode response = executeForJsonResponse(restClient.get()
+            .uri(jobsPath + "/" + jobId)
+            , "consultar job", true);
+        return SandboxOrchestratorJobResponse.from(response);
+    }
+
+    private JsonNode executeForJsonResponse(RestClient.RequestHeadersSpec<?> requestSpec,
+                                            String operationDescription,
+                                            boolean allowNotFound) {
+        return requestSpec.exchange((request, response) -> {
+            HttpStatusCode status = response.getStatusCode();
+            MediaType contentType = response.getHeaders().getContentType();
+            String body = response.bodyTo(String.class);
+
+            if (allowNotFound && status.value() == 404) {
+                log.warn("Job não encontrado no sandbox-orchestrator (operação: {})", operationDescription);
+                return null;
+            }
+
+            if (!status.is2xxSuccessful()) {
+                logIfNeeded(status, contentType, body);
+                throw new IllegalStateException(buildErrorMessage(status, contentType));
+            }
+
+            if (!isJsonContentType(contentType)) {
+                logIfNeeded(status, contentType, body);
+                throw new IllegalStateException(buildErrorMessage(status, contentType));
+            }
+
+            if (body == null || body.isBlank()) {
+                logIfNeeded(status, contentType, body);
+                throw new IllegalStateException("sandbox-orchestrator retornou " + status.value() + " com corpo vazio");
+            }
+
+            try {
+                return objectMapper.readTree(body);
+            } catch (JsonProcessingException ex) {
+                logIfNeeded(status, contentType, body);
+                throw new IllegalStateException(buildErrorMessage(status, contentType), ex);
+            }
+        });
+    }
+
+    private void logIfNeeded(HttpStatusCode status, MediaType contentType, String body) {
+        log.warn("Resposta inesperada do sandbox-orchestrator: status={}, content-type={}, body={}",
+            status.value(),
+            formatContentType(contentType),
+            truncateBody(body));
+    }
+
+    private String buildErrorMessage(HttpStatusCode status, MediaType contentType) {
+        return "sandbox-orchestrator retornou " + status.value() + " com corpo " + formatContentType(contentType);
+    }
+
+    private String formatContentType(MediaType contentType) {
+        if (contentType == null) {
+            return "desconhecido";
         }
+        return contentType.toString();
+    }
+
+    private String truncateBody(String body) {
+        if (body == null) {
+            return "";
+        }
+        if (body.length() <= MAX_LOG_BODY_LENGTH) {
+            return body;
+        }
+        return body.substring(0, MAX_LOG_BODY_LENGTH) + "...(truncado)";
+    }
+
+    private boolean isJsonContentType(MediaType contentType) {
+        if (contentType == null) {
+            return false;
+        }
+        if (MediaType.APPLICATION_JSON.isCompatibleWith(contentType)) {
+            return true;
+        }
+        String subtype = contentType.getSubtype();
+        return subtype != null && subtype.endsWith("+json");
     }
 
     public record SandboxOrchestratorJobResponse(
