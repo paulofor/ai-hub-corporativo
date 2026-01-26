@@ -30,6 +30,7 @@ services:
       default:
         aliases:
           - backend
+        ipv4_address: 172.28.0.10
 
   frontend:
     image: ${FRONTEND_IMAGE:-ghcr.io/paulofor/ai-hub-corporativo-frontend:latest}
@@ -43,9 +44,11 @@ services:
       - "${FRONTEND_HTTP_PORT:-8082}:80"
     networks:
       default:
+        ipv4_address: 172.28.0.11
       public-net:
         aliases:
           - aihub-frontend
+        ipv4_address: 172.29.0.11
 
   reverse-proxy-cert-init:
     image: alpine:3.19
@@ -73,6 +76,9 @@ services:
           echo "Self-signed certificate generated for iahubcorp.online."
     volumes:
       - ./infra/nginx/letsencrypt:/etc/letsencrypt
+    networks:
+      default:
+        ipv4_address: 172.28.0.12
 
   reverse-proxy:
     image: nginx:1.25-alpine
@@ -112,9 +118,11 @@ services:
       retries: 3
     networks:
       default:
+        ipv4_address: 172.28.0.13
       public-net:
         aliases:
           - iahubcorp.online
+        ipv4_address: 172.29.0.13
 
   certbot:
     image: certbot/certbot:v2.10.0
@@ -127,6 +135,9 @@ services:
     volumes:
       - ./infra/nginx/letsencrypt:/etc/letsencrypt
       - ./infra/nginx/certbot-www:/var/www/certbot
+    networks:
+      default:
+        ipv4_address: 172.28.0.14
 
   sandbox-orchestrator:
     image: ${SANDBOX_ORCHESTRATOR_IMAGE:-ghcr.io/paulofor/ai-hub-corporativo-sandbox:latest}
@@ -150,11 +161,18 @@ services:
       default:
         aliases:
           - sandbox-orchestrator
+        ipv4_address: 172.28.0.15
       public-net:
         aliases:
           - sandbox-orchestrator
+        ipv4_address: 172.29.0.15
 
 networks:
   default:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
   public-net:
-    external: true
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16
