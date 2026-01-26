@@ -216,15 +216,17 @@ export default function UploadJobPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Arquivos da solicitação (docs, imagens, logs, etc.)</label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
+              Arquivos da solicitação (docs, imagens, logs, ZIP de fontes, etc.)
+            </label>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Envie documentos, imagens ou arquivos de apoio que façam parte do pedido; eles ficarão disponíveis no
-              sandbox junto com o código.
+              Envie documentos, imagens, arquivos de apoio ou um ZIP com fontes de programas; eles ficarão disponíveis
+              no sandbox junto com o código.
             </p>
             <input
               type="file"
               multiple
-              accept=".txt,.csv,.md,.log,.json,.yaml,.yml,.xml,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.odt,.odp,.ods,image/*"
+              accept=".txt,.csv,.md,.log,.json,.yaml,.yml,.xml,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.odt,.odp,.ods,.zip,image/*"
               onChange={handleProblemFilesChange}
               className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-emerald-100 file:px-3 file:py-2 file:text-emerald-700 hover:file:bg-emerald-200 dark:text-slate-200 dark:file:bg-emerald-900/40 dark:file:text-emerald-100"
             />
