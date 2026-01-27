@@ -92,6 +92,9 @@ export default function UploadJobDetailPage() {
   const lastUpdatedLabel = updatedAt ? new Date(updatedAt).toLocaleString() : null;
   const zipReady = Boolean(job?.resultZipBase64 || job?.resultZipReady);
 
+  const jobCostLabel = formatCost(job?.cost);
+  const showCostBadge = jobCostLabel !== '—' && Boolean(job);
+
   const zipStatusMessage = (() => {
     if (!job) {
       return 'Carregue o status do job para verificar o ZIP.';
@@ -124,6 +127,7 @@ export default function UploadJobDetailPage() {
             <p className="text-sm text-slate-500">
               ID: {jobId ?? '—'}
               {lastUpdatedLabel && <> • Última sincronização em {lastUpdatedLabel}</>}
+              {showCostBadge && <> • Custo estimado: {jobCostLabel}</>}
             </p>
           </div>
           <div className="flex flex-wrap gap-3 text-sm">

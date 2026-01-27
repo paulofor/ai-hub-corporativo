@@ -102,7 +102,13 @@ public class SandboxOrchestratorClient {
                 .ifPresent(value -> credentials.put("contentType", value));
             body.put("applicationDefaultCredentials", credentials);
         }
-
+        if (request.gitSshPrivateKey() != null) {
+            Map<String, Object> gitKey = new HashMap<>();
+            gitKey.put("base64", request.gitSshPrivateKey().base64());
+            Optional.ofNullable(request.gitSshPrivateKey().filename())
+                .ifPresent(value -> gitKey.put("filename", value));
+            body.put("gitSshPrivateKey", gitKey);
+        }
 
         log.info("Enviando job {} (upload) para sandbox-orchestrator no path {}", request.jobId(), jobsPath);
         JsonNode response = executeForJsonResponse(restClient.post()

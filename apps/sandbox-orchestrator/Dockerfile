@@ -7,8 +7,9 @@ COPY . .
 RUN npm run build
 
 FROM node:20-alpine AS production
+ARG CFR_VERSION=0.152
 WORKDIR /app
-RUN apk add --no-cache git python3 py3-pip patch openjdk21-jdk maven ripgrep \
+RUN apk add --no-cache git python3 py3-pip patch openjdk21-jdk maven ripgrep curl \
   && cat <<'EOF' >/usr/local/bin/apply_patch
 #!/bin/sh
 set -euo pipefail
@@ -40,6 +41,11 @@ fi
 "$PATCH_BIN" -p0 -u -N --no-backup-if-mismatch <"${TMPFILE}.patch"
 EOF
 RUN chmod +x /usr/local/bin/apply_patch
+RUN mkdir -p /opt/tools \
+  && curl -sSL -o /opt/tools/cfr-${CFR_VERSION}.jar https://github.com/leibnitz27/cfr/releases/download/${CFR_VERSION}/cfr-${CFR_VERSION}.jar \
+  && ln -sf /opt/tools/cfr-${CFR_VERSION}.jar /opt/tools/cfr.jar \
+  && printf '#!/bin/sh\nexec java -jar /opt/tools/cfr.jar "$@"\n' >/usr/local/bin/cfr \
+  && chmod +x /usr/local/bin/cfr
 RUN npm install -g typescript
 COPY package*.json ./
 RUN npm ci --omit=dev

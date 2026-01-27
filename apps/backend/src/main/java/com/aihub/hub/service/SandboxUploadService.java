@@ -28,15 +28,22 @@ public class SandboxUploadService {
     private final AuditService auditService;
     private final UploadJobRepository uploadJobRepository;
     private final long maxInlineZipBytes;
+    private final TokenCostCalculator tokenCostCalculator;
+    private final String defaultUploadModel;
 
     public SandboxUploadService(SandboxOrchestratorClient sandboxOrchestratorClient,
                                 AuditService auditService,
                                 UploadJobRepository uploadJobRepository,
-                                @Value("${hub.upload-jobs.max-inline-zip-bytes:8388608}") long maxInlineZipBytes) {
+                                @Value("${hub.upload-jobs.max-inline-zip-bytes:8388608}") long maxInlineZipBytes,
+                                TokenCostCalculator tokenCostCalculator,
+                                @Value("${hub.upload-jobs.default-model:}") String uploadJobsDefaultModel,
+                                @Value("${hub.codex.model:gpt-5-codex}") String codexDefaultModel) {
         this.sandboxOrchestratorClient = sandboxOrchestratorClient;
         this.auditService = auditService;
         this.uploadJobRepository = uploadJobRepository;
         this.maxInlineZipBytes = Math.max(0L, maxInlineZipBytes);
+        this.tokenCostCalculator = tokenCostCalculator;
+        this.defaultUploadModel = resolveDefaultModel(uploadJobsDefaultModel, codexDefaultModel);
     }
 
     @Transactional
@@ -57,6 +64,9 @@ public class SandboxUploadService {
         List<UploadedProblemFile> problemFiles = resolveProblemFiles(request.getProblemFiles());
         UploadedApplicationDefaultCredential applicationDefaultCredentials =
             resolveApplicationDefaultCredentials(request.getApplicationDefaultCredentials());
+        UploadedGitSshKey gitSshPrivateKey = resolveGitSshPrivateKey(request.getGitSshPrivateKey());
+        String requestedModel = normalizeModel(request.getModel());
+        String resolvedModel = requestedModel != null ? requestedModel : defaultUploadModel;
 
         SandboxUploadJobRequest payload = new SandboxUploadJobRequest(
             jobId,
@@ -65,11 +75,12 @@ public class SandboxUploadService {
             sourceZip.getOriginalFilename(),
             request.getTestCommand(),
             request.getProfile(),
-            request.getModel(),
+            resolvedModel,
             "upload://" + jobId,
             "upload",
             problemFiles,
-            applicationDefaultCredentials
+            applicationDefaultCredentials,
+            gitSshPrivateKey
         );
 
         UploadJobRecord record = new UploadJobRecord();
@@ -77,7 +88,7 @@ public class SandboxUploadService {
         record.setTaskDescription(request.getTaskDescription());
         record.setTestCommand(request.getTestCommand());
         record.setProfile(request.getProfile());
-        record.setModel(request.getModel());
+        record.setModel(resolvedModel);
         record.setZipName(sourceZip.getOriginalFilename());
         record.setStatus("PENDING");
         record.setResultZipReady(Boolean.FALSE);
@@ -173,6 +184,7 @@ public class SandboxUploadService {
         Optional.ofNullable(payload.completionTokens()).ifPresent(record::setCompletionTokens);
         Optional.ofNullable(payload.totalTokens()).ifPresent(record::setTotalTokens);
         Optional.ofNullable(payload.cost()).ifPresent(record::setCost);
+        enrichUsageFromPricing(record);
         if (payload.changedFiles() != null && !payload.changedFiles().isEmpty()) {
             record.setChangedFiles(String.join("\n", payload.changedFiles()));
         }
@@ -243,6 +255,25 @@ public class SandboxUploadService {
         return status != null && "COMPLETED".equalsIgnoreCase(status.trim());
     }
 
+    private UploadedGitSshKey resolveGitSshPrivateKey(MultipartFile keyFile) {
+        if (keyFile == null || keyFile.isEmpty()) {
+            return null;
+        }
+
+        String filename = Optional.ofNullable(keyFile.getOriginalFilename())
+            .filter(name -> !name.isBlank())
+            .orElse("gitlab_id_key");
+
+        try {
+            return new UploadedGitSshKey(
+                filename,
+                Base64.getEncoder().encodeToString(keyFile.getBytes())
+            );
+        } catch (IOException e) {
+            throw new IllegalStateException("Falha ao ler a chave privada SSH enviada", e);
+        }
+    }
+
     private UploadedApplicationDefaultCredential resolveApplicationDefaultCredentials(MultipartFile credentialFile) {
         if (credentialFile == null || credentialFile.isEmpty()) {
             return null;
@@ -261,6 +292,54 @@ public class SandboxUploadService {
         } catch (IOException e) {
             throw new IllegalStateException("Falha ao ler o arquivo de credenciais GCP enviado", e);
         }
+    }
+
+    private void enrichUsageFromPricing(UploadJobRecord record) {
+        String model = normalizeModel(record.getModel());
+        if (model == null) {
+            return;
+        }
+        TokenCostBreakdown breakdown = tokenCostCalculator.calculate(
+            model,
+            record.getPromptTokens(),
+            record.getCachedPromptTokens(),
+            record.getCompletionTokens(),
+            record.getTotalTokens()
+        );
+        if (breakdown == null) {
+            return;
+        }
+        if (record.getPromptTokens() == null && breakdown.inputTokens() != null) {
+            record.setPromptTokens(breakdown.inputTokens());
+        }
+        if (record.getCachedPromptTokens() == null && breakdown.cachedInputTokens() != null) {
+            record.setCachedPromptTokens(breakdown.cachedInputTokens());
+        }
+        if (record.getCompletionTokens() == null && breakdown.outputTokens() != null) {
+            record.setCompletionTokens(breakdown.outputTokens());
+        }
+        if (record.getTotalTokens() == null && breakdown.totalTokens() != null) {
+            record.setTotalTokens(breakdown.totalTokens());
+        }
+        if (record.getCost() == null && breakdown.totalCost() != null) {
+            record.setCost(breakdown.totalCost());
+        }
+    }
+
+    private String resolveDefaultModel(String uploadDefault, String codexDefault) {
+        String sanitizedUpload = normalizeModel(uploadDefault);
+        if (sanitizedUpload != null) {
+            return sanitizedUpload;
+        }
+        return normalizeModel(codexDefault);
+    }
+
+    private String normalizeModel(String model) {
+        if (model == null) {
+            return null;
+        }
+        String trimmed = model.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private List<UploadedProblemFile> resolveProblemFiles(List<MultipartFile> attachments) {
