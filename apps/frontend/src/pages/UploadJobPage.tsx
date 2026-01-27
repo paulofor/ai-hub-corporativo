@@ -293,7 +293,7 @@ export default function UploadJobPage() {
             <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Chave privada SSH para GitLab</label>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Opcional: envie a chave privada (PEM/OpenSSH) usada pelo GitLab para permitir que o Maven e comandos git no sandbox
-              autentiquem via SSH. Ela será salva apenas dentro do workspace temporário em ~/.ssh/.
+              autentiquem via SSH. Ela será salva apenas dentro do workspace temporário em ~/.ssh/id_ed25519.
             </p>
             <input
               type="file"

@@ -252,16 +252,8 @@ export class SandboxJobProcessor implements JobProcessor {
     }
   }
 
-  private sanitizeSshKeyFilename(name: string | undefined): string {
-    const fallback = 'id_upload_key';
-    if (!name) {
-      return fallback;
-    }
-    const normalized = path.basename(name.trim()).replace(/[\/:]/g, '_');
-    if (!normalized || normalized === '.' || normalized === '..') {
-      return fallback;
-    }
-    return normalized;
+  private resolveSshKeyFilename(): string {
+    return 'id_ed25519';
   }
 
   private async materializeGitSshPrivateKey(job: SandboxJob): Promise<void> {
@@ -272,7 +264,11 @@ export class SandboxJobProcessor implements JobProcessor {
 
     const homeDir = this.resolveHomeDir(job);
     const sshDir = path.join(homeDir, '.ssh');
-    const filename = this.sanitizeSshKeyFilename(key.filename);
+    const filename = this.resolveSshKeyFilename();
+    const originalName = key.filename?.trim();
+    if (originalName && originalName !== filename) {
+      this.log(job, `chave SSH enviada (${path.basename(originalName)}) será renomeada para ${filename}`);
+    }
     let buffer: Buffer;
     try {
       buffer = Buffer.from(key.base64, 'base64');
