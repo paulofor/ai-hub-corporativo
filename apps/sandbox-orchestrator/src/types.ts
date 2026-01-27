@@ -18,6 +18,11 @@ export interface UploadedApplicationDefaultCredential {
   contentType?: string;
 }
 
+export interface UploadedGitSshPrivateKey {
+  base64: string;
+  filename?: string;
+}
+
 export interface SandboxJob {
   jobId: string;
   repoSlug?: string;
@@ -30,6 +35,7 @@ export interface SandboxJob {
   model?: string;
   uploadedZip?: UploadedZip;
   applicationDefaultCredentials?: UploadedApplicationDefaultCredential;
+  gitSshPrivateKey?: UploadedGitSshPrivateKey;
   problemFiles?: UploadedProblemFile[];
   status: JobStatus;
   summary?: string;
@@ -48,6 +54,7 @@ export interface SandboxJob {
   logs: string[];
   createdAt: string;
   updatedAt: string;
+  gitSshKeyPath?: string;
 }
 
 export interface JobProcessor {

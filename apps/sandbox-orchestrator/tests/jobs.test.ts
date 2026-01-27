@@ -176,6 +176,47 @@ test('materializa credenciais do GCP no sandbox e exporta variáveis para run_sh
   await fs.rm(workspace, { recursive: true, force: true });
 });
 
+test('materializa chave SSH personalizada para jobs de upload', async () => {
+  const workspace = await fs.mkdtemp(path.join(os.tmpdir(), 'sandbox-ssh-key-'));
+  const repoPath = path.join(workspace, 'repo');
+  await fs.mkdir(repoPath, { recursive: true });
+
+  const processor = new SandboxJobProcessor();
+  const keyContent = '-----BEGIN OPENSSH PRIVATE KEY-----\nMOCKKEYDATA';
+  const job: SandboxJob = {
+    jobId: 'job-ssh-key',
+    repoUrl: 'upload://job-ssh-key',
+    branch: 'upload',
+    taskDescription: 'noop',
+    status: 'PENDING',
+    logs: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    sandboxPath: workspace,
+    gitSshPrivateKey: { base64: Buffer.from(keyContent).toString('base64'), filename: 'gitlab_key' },
+  } as SandboxJob;
+
+  await (processor as any).materializeGitSshPrivateKey(job);
+
+  const keyPath = path.join(workspace, '.ssh', 'gitlab_key');
+  const savedKey = await fs.readFile(keyPath, 'utf-8');
+  assert.equal(savedKey, keyContent);
+  assert.equal(job.gitSshKeyPath, keyPath);
+
+  const config = await fs.readFile(path.join(workspace, '.ssh', 'config'), 'utf-8');
+  assert.ok(config.includes(keyPath));
+
+  const envResult = await (processor as any).handleRunShell(
+    { command: ['sh', '-c', 'echo $GIT_SSH_COMMAND'], cwd: '.' },
+    repoPath,
+    job,
+  );
+  assert.ok(envResult.stdout.includes(keyPath));
+
+  await fs.rm(workspace, { recursive: true, force: true });
+});
+
+
 test('respects SANDBOX_WORKDIR when creating workspaces', async () => {
   const originalWorkdir = process.env.SANDBOX_WORKDIR;
   const customBase = await fs.mkdtemp(path.join(os.tmpdir(), 'sandbox-custom-base-'));

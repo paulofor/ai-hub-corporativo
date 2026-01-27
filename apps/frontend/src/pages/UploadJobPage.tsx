@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useCallback, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import client from '../api/client';
 import { useToasts } from '../components/ToastContext';
@@ -31,6 +31,7 @@ export default function UploadJobPage() {
   const [file, setFile] = useState<File | null>(null);
   const [problemFiles, setProblemFiles] = useState<File[]>([]);
   const [gcpCredentials, setGcpCredentials] = useState<File | null>(null);
+  const [gitPrivateKey, setGitPrivateKey] = useState<File | null>(null);
   const [jobs, setJobs] = useState<UploadJob[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +121,9 @@ export default function UploadJobPage() {
     if (gcpCredentials) {
       formData.append('applicationDefaultCredentials', gcpCredentials);
     }
+    if (gitPrivateKey) {
+      formData.append('gitSshPrivateKey', gitPrivateKey);
+    }
 
     try {
       const response = await client.post('/upload-jobs', formData, {
@@ -138,6 +142,7 @@ export default function UploadJobPage() {
       setModel('');
       setProblemFiles([]);
       setGcpCredentials(null);
+      setGitPrivateKey(null);
       pushToast('Job criado e enviado para o sandbox.');
     } catch (err) {
       setError((err as Error).message);
@@ -186,6 +191,9 @@ export default function UploadJobPage() {
       pushToast('Não foi possível preparar o download do ZIP com os fontes gerados.');
     }
   };
+
+  const currencyFormatter = useMemo(() => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'USD' }), []);
+  const formatCost = (value?: number) => (value != null ? currencyFormatter.format(value) : '—');
 
   return (
     <section className="space-y-6">
@@ -273,6 +281,34 @@ export default function UploadJobPage() {
                 <button
                   type="button"
                   onClick={() => setGcpCredentials(null)}
+                  className="text-[11px] font-semibold text-emerald-700 hover:underline"
+                >
+                  Remover
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Chave privada SSH para GitLab</label>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Opcional: envie a chave privada (PEM/OpenSSH) usada pelo GitLab para permitir que o Maven e comandos git no sandbox
+              autentiquem via SSH. Ela será salva apenas dentro do workspace temporário em ~/.ssh/.
+            </p>
+            <input
+              type="file"
+              accept=".pem,.key,.ppk,.priv,.ssh,.txt,.cfg,.config,.rsa,.ed25519,text/plain"
+              onChange={(event) => setGitPrivateKey(event.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-emerald-100 file:px-3 file:py-2 file:text-emerald-700 hover:file:bg-emerald-200 dark:text-slate-200 dark:file:bg-emerald-900/40 dark:file:text-emerald-100"
+            />
+            {gitPrivateKey && (
+              <div className="flex items-center justify-between rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                <span className="truncate pr-3" title={gitPrivateKey.name}>
+                  Selecionado: {gitPrivateKey.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setGitPrivateKey(null)}
                   className="text-[11px] font-semibold text-emerald-700 hover:underline"
                 >
                   Remover
@@ -381,6 +417,7 @@ export default function UploadJobPage() {
                 const title = resolveUploadJobTitle(job.jobId, job.title, job.taskDescription ? buildJobTitle(job.taskDescription) : undefined);
                 const updatedAt = job.updatedAt ?? job.lastSyncedAt;
                 const lastUpdatedLabel = updatedAt ? new Date(updatedAt).toLocaleString() : null;
+                const costLabel = formatCost(job.cost);
                 return (
                   <div key={job.jobId} className="rounded border border-slate-200 dark:border-slate-800 p-3 text-sm">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -394,6 +431,7 @@ export default function UploadJobPage() {
                         <p className="text-xs text-slate-500">
                           ID: {job.jobId}
                           {lastUpdatedLabel && <> • Atualizado em {lastUpdatedLabel}</>}
+                          <> • Custo estimado: {costLabel}</>
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-emerald-700">

@@ -24,6 +24,8 @@ public class CreateUploadJobRequest {
 
     private MultipartFile applicationDefaultCredentials;
 
+    private MultipartFile gitSshPrivateKey;
+
     public String getTaskDescription() {
         return taskDescription;
     }
@@ -78,5 +80,13 @@ public class CreateUploadJobRequest {
 
     public void setApplicationDefaultCredentials(MultipartFile applicationDefaultCredentials) {
         this.applicationDefaultCredentials = applicationDefaultCredentials;
+    }
+
+    public MultipartFile getGitSshPrivateKey() {
+        return gitSshPrivateKey;
+    }
+
+    public void setGitSshPrivateKey(MultipartFile gitSshPrivateKey) {
+        this.gitSshPrivateKey = gitSshPrivateKey;
     }
 }

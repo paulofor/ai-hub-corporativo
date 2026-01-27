@@ -119,6 +119,7 @@ export class SandboxJobProcessor implements JobProcessor {
 
     try {
       await this.materializeApplicationDefaultCredentials(job);
+      await this.materializeGitSshPrivateKey(job);
 
       const isUpload = this.isUploadJob(job);
       let baseCommit: string | undefined;
@@ -248,6 +249,83 @@ export class SandboxJobProcessor implements JobProcessor {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       throw new Error(`não foi possível salvar credenciais do GCP: ${message}`);
+    }
+  }
+
+  private sanitizeSshKeyFilename(name: string | undefined): string {
+    const fallback = 'id_upload_key';
+    if (!name) {
+      return fallback;
+    }
+    const normalized = path.basename(name.trim()).replace(/[\/:]/g, '_');
+    if (!normalized || normalized === '.' || normalized === '..') {
+      return fallback;
+    }
+    return normalized;
+  }
+
+  private async materializeGitSshPrivateKey(job: SandboxJob): Promise<void> {
+    const key = job.gitSshPrivateKey;
+    if (!key?.base64) {
+      return;
+    }
+
+    const homeDir = this.resolveHomeDir(job);
+    const sshDir = path.join(homeDir, '.ssh');
+    const filename = this.sanitizeSshKeyFilename(key.filename);
+    let buffer: Buffer;
+    try {
+      buffer = Buffer.from(key.base64, 'base64');
+    } catch {
+      throw new Error('chave SSH enviada é inválida (base64)');
+    }
+
+    try {
+      await fs.mkdir(sshDir, { recursive: true, mode: 0o700 });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`não foi possível preparar ~/.ssh: ${message}`);
+    }
+
+    const destination = path.join(sshDir, filename);
+    await fs.writeFile(destination, buffer, { mode: 0o600 });
+    try {
+      await fs.chmod(destination, 0o600);
+      await fs.chmod(sshDir, 0o700);
+    } catch {
+      // noop
+    }
+
+    await this.ensureSshConfig(job, sshDir, destination);
+    job.gitSshKeyPath = destination;
+    const relative = path.relative(homeDir, destination) || destination;
+    this.log(job, `chave SSH personalizada salva em ${relative}`);
+  }
+
+  private async ensureSshConfig(job: SandboxJob, sshDir: string, keyPath: string): Promise<void> {
+    const configPath = path.join(sshDir, 'config');
+    const block = `# ai-hub ssh key
+Host *
+  IdentityFile ${keyPath}
+  IdentitiesOnly yes
+  StrictHostKeyChecking no
+
+`;
+    try {
+      let existing = '';
+      try {
+        existing = await fs.readFile(configPath, 'utf-8');
+      } catch {
+        // arquivo inexistente será criado
+      }
+      const trimmed = existing.trimEnd();
+      const content = trimmed ? `${trimmed}
+
+${block}` : block;
+      await fs.writeFile(configPath, content, { mode: 0o600 });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(job, `não foi possível atualizar ~/.ssh/config: ${message}`);
     }
   }
 
@@ -528,6 +606,7 @@ export class SandboxJobProcessor implements JobProcessor {
 Modo econômico ativo: minimize leituras extensas, priorize comandos curtos, escreva respostas objetivas e evite reexecuções desnecessárias.`
       : '';
     const problemFilesInstruction = this.describeProblemFiles(job, repoPath);
+    const javaDecompilerInstruction = '\nO utilitário `cfr` está instalado para decompilar arquivos .class de Java: execute `cfr <arquivo.class>` para gerar uma versão legível do código.';
     const messages: ResponseItem[] = [
       {
         type: 'message',
@@ -538,7 +617,7 @@ Modo econômico ativo: minimize leituras extensas, priorize comandos curtos, esc
             type: 'input_text',
             text: `Você está operando em um sandbox isolado em ${repoPath}. Use as tools para ler, alterar arquivos e executar comandos. Test command sugerido: ${
               job.testCommand ?? 'n/d'
-            }. Sempre trabalhe somente dentro do diretório do repositório. Prefira usar o comando rg para buscas recursivas em vez de grep -R, que é mais lento.${profileInstruction}${problemFilesInstruction}`,
+            }. Sempre trabalhe somente dentro do diretório do repositório. Prefira usar o comando rg para buscas recursivas em vez de grep -R, que é mais lento.${profileInstruction}${problemFilesInstruction}${javaDecompilerInstruction}`,
           },
         ],
       },
@@ -946,6 +1025,9 @@ Modo econômico ativo: minimize leituras extensas, priorize comandos curtos, esc
     const homeDir = this.resolveHomeDir(job);
     const env: NodeJS.ProcessEnv = { ...process.env, HOME: homeDir };
     const credentialsPath = job.gcpCredentialsPath;
+    if (job.gitSshKeyPath) {
+      env.GIT_SSH_COMMAND = `ssh -i ${job.gitSshKeyPath} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no`;
+    }
     if (credentialsPath) {
       env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
       env.CLOUDSDK_CONFIG = path.dirname(credentialsPath);

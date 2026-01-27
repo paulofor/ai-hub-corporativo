@@ -13,6 +13,7 @@ public record SandboxUploadJobRequest(
     String repoUrl,
     String branch,
     List<UploadedProblemFile> problemFiles,
-    UploadedApplicationDefaultCredential applicationDefaultCredentials
+    UploadedApplicationDefaultCredential applicationDefaultCredentials,
+    UploadedGitSshKey gitSshPrivateKey
 ) {
 }
