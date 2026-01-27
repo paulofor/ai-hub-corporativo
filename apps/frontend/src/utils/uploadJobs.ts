@@ -1,3 +1,5 @@
+import client from '../api/client';
+
 export type JobStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
 
 export interface UploadJob {
@@ -126,25 +128,66 @@ export const parseUploadJob = (payload: unknown): UploadJob => {
   };
 };
 
-export const downloadUploadJobZip = (job: UploadJob) => {
-  if (!job.resultZipBase64) {
-    throw new Error('ZIP indisponível para este job.');
-  }
-  const binaryString = atob(job.resultZipBase64);
+const triggerZipDownload = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+const base64ToBlob = (base64: string) => {
+  const binaryString = atob(base64);
   const length = binaryString.length;
   const bytes = new Uint8Array(length);
   for (let i = 0; i < length; i += 1) {
     bytes[i] = binaryString.charCodeAt(i);
   }
-  const blob = new Blob([bytes], { type: 'application/zip' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = job.resultZipFilename || `${job.jobId}-resultado.zip`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  return new Blob([bytes], { type: 'application/zip' });
+};
+
+const extractFilenameFromHeaders = (headers: Record<string, unknown>): string | undefined => {
+  if (!headers) {
+    return undefined;
+  }
+  const rawHeader = headers['content-disposition'] || headers['Content-Disposition'];
+  if (!rawHeader || typeof rawHeader !== 'string') {
+    return undefined;
+  }
+  const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(rawHeader);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+  const asciiMatch = /filename="?([^";]+)"?/i.exec(rawHeader);
+  return asciiMatch?.[1];
+};
+
+export const downloadUploadJobZip = async (job: UploadJob) => {
+  const fallbackName = job.resultZipFilename || (job.jobId ? `${job.jobId}-resultado.zip` : 'resultado.zip');
+  if (job.resultZipBase64) {
+    const blob = base64ToBlob(job.resultZipBase64);
+    triggerZipDownload(blob, fallbackName);
+    return;
+  }
+  if (!job.jobId) {
+    throw new Error('ZIP indisponível para este job.');
+  }
+  if (!job.resultZipReady) {
+    throw new Error('ZIP ainda não está disponível para download.');
+  }
+  const response = await client.get<Blob>(`/upload-jobs/${job.jobId}/result-zip`, {
+    responseType: 'blob'
+  });
+  const serverFilename = extractFilenameFromHeaders(response.headers as Record<string, unknown>);
+  const blob = response.data;
+  triggerZipDownload(blob, serverFilename || fallbackName);
 };
 
 const statusClasses: Record<JobStatus, string> = {

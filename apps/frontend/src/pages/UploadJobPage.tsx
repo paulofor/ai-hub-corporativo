@@ -178,9 +178,9 @@ export default function UploadJobPage() {
     }
   };
 
-  const handleDownloadZip = (job: UploadJob) => {
+  const handleDownloadZip = async (job: UploadJob) => {
     try {
-      downloadUploadJobZip(job);
+      await downloadUploadJobZip(job);
     } catch (err) {
       console.error('Falha ao preparar ZIP de resultado', err);
       pushToast('Não foi possível preparar o download do ZIP com os fontes gerados.');
@@ -428,7 +428,7 @@ export default function UploadJobPage() {
                     )}
                     {job.status === 'COMPLETED' && (
                       <div className="mt-3 flex flex-wrap items-center gap-2">
-                        {job.resultZipBase64 ? (
+                        {job.resultZipBase64 || job.resultZipReady ? (
                           <button
                             type="button"
                             onClick={() => handleDownloadZip(job)}
@@ -436,8 +436,6 @@ export default function UploadJobPage() {
                           >
                             Baixar ZIP com fontes atualizados
                           </button>
-                        ) : job.resultZipReady ? (
-                          <p className="text-xs text-slate-500 dark:text-slate-400">ZIP pronto — abra os detalhes para baixar novamente.</p>
                         ) : (
                           <p className="text-xs text-slate-500 dark:text-slate-400">ZIP ainda está sendo gerado.</p>
                         )}
