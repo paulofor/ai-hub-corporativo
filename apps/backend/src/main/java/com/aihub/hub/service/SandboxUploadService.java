@@ -4,6 +4,9 @@ import com.aihub.hub.domain.UploadJobRecord;
 import com.aihub.hub.dto.CreateUploadJobRequest;
 import com.aihub.hub.dto.UploadJobView;
 import com.aihub.hub.repository.UploadJobRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -19,16 +22,21 @@ import java.util.UUID;
 @Service
 public class SandboxUploadService {
 
+    private static final Logger log = LoggerFactory.getLogger(SandboxUploadService.class);
+
     private final SandboxOrchestratorClient sandboxOrchestratorClient;
     private final AuditService auditService;
     private final UploadJobRepository uploadJobRepository;
+    private final long maxInlineZipBytes;
 
     public SandboxUploadService(SandboxOrchestratorClient sandboxOrchestratorClient,
                                 AuditService auditService,
-                                UploadJobRepository uploadJobRepository) {
+                                UploadJobRepository uploadJobRepository,
+                                @Value("${hub.upload-jobs.max-inline-zip-bytes:8388608}") long maxInlineZipBytes) {
         this.sandboxOrchestratorClient = sandboxOrchestratorClient;
         this.auditService = auditService;
         this.uploadJobRepository = uploadJobRepository;
+        this.maxInlineZipBytes = Math.max(0L, maxInlineZipBytes);
     }
 
     @Transactional
@@ -72,6 +80,8 @@ public class SandboxUploadService {
         record.setModel(request.getModel());
         record.setZipName(sourceZip.getOriginalFilename());
         record.setStatus("PENDING");
+        record.setResultZipReady(Boolean.FALSE);
+        record.setResultZipBase64(null);
         record.setUpdatedAt(Instant.now());
         uploadJobRepository.save(record);
 
@@ -118,6 +128,28 @@ public class SandboxUploadService {
         return UploadJobView.from(record);
     }
 
+    @Transactional
+    public ResultZip downloadResultZip(String jobId) {
+        UploadJobRecord record = uploadJobRepository.findByJobId(jobId)
+            .orElseThrow(() -> new IllegalArgumentException("Job não encontrado"));
+
+        String inlineZip = sanitizeBase64(record.getResultZipBase64());
+        if (inlineZip == null) {
+            SandboxOrchestratorClient.SandboxOrchestratorJobResponse payload = sandboxOrchestratorClient.getJob(jobId);
+            if (payload == null || sanitizeBase64(payload.resultZipBase64()) == null) {
+                throw new IllegalStateException("ZIP ainda não está disponível para download");
+            }
+            inlineZip = payload.resultZipBase64();
+            handleResultZip(record, inlineZip);
+            Optional.ofNullable(payload.resultZipFilename()).ifPresent(record::setResultZipFilename);
+            record.setUpdatedAt(Instant.now());
+            uploadJobRepository.save(record);
+        }
+
+        byte[] bytes = decodeZip(inlineZip);
+        return new ResultZip(resolveZipFilename(record), bytes);
+    }
+
     private void populateFromOrchestrator(UploadJobRecord record, SandboxOrchestratorClient.SandboxOrchestratorJobResponse payload) {
         if (payload == null) {
             return;
@@ -127,7 +159,13 @@ public class SandboxUploadService {
         Optional.ofNullable(payload.summary()).ifPresent(record::setSummary);
         Optional.ofNullable(payload.error()).ifPresent(record::setError);
         Optional.ofNullable(payload.patch()).ifPresent(record::setPatch);
-        Optional.ofNullable(payload.resultZipBase64()).ifPresent(record::setResultZipBase64);
+        String inlineZip = sanitizeBase64(payload.resultZipBase64());
+        if (inlineZip != null) {
+            handleResultZip(record, inlineZip);
+        } else if (!isCompleted(payload.status())) {
+            record.setResultZipReady(Boolean.FALSE);
+            record.setResultZipBase64(null);
+        }
         Optional.ofNullable(payload.resultZipFilename()).ifPresent(record::setResultZipFilename);
         Optional.ofNullable(payload.pullRequestUrl()).ifPresent(record::setPullRequestUrl);
         Optional.ofNullable(payload.promptTokens()).ifPresent(record::setPromptTokens);
@@ -138,6 +176,71 @@ public class SandboxUploadService {
         if (payload.changedFiles() != null && !payload.changedFiles().isEmpty()) {
             record.setChangedFiles(String.join("\n", payload.changedFiles()));
         }
+    }
+
+    private void handleResultZip(UploadJobRecord record, String base64Zip) {
+        if (base64Zip == null || base64Zip.isBlank()) {
+            return;
+        }
+        record.setResultZipReady(Boolean.TRUE);
+        long estimatedBytes = estimateBase64Bytes(base64Zip);
+        if (shouldPersistInlineZip(estimatedBytes)) {
+            record.setResultZipBase64(base64Zip);
+        } else {
+            if (record.getResultZipBase64() != null) {
+                record.setResultZipBase64(null);
+            }
+            log.info(
+                "ZIP do job {} tem {} bytes (limite inline {}), mantendo apenas referência remota",
+                record.getJobId(),
+                estimatedBytes,
+                maxInlineZipBytes
+            );
+        }
+    }
+
+    private boolean shouldPersistInlineZip(long estimatedBytes) {
+        return maxInlineZipBytes > 0 && estimatedBytes > 0 && estimatedBytes <= maxInlineZipBytes;
+    }
+
+    private long estimateBase64Bytes(String base64Zip) {
+        if (base64Zip == null || base64Zip.isEmpty()) {
+            return 0L;
+        }
+        long length = base64Zip.length();
+        long padding = 0L;
+        if (base64Zip.endsWith("==")) {
+            padding = 2L;
+        } else if (base64Zip.endsWith("=")) {
+            padding = 1L;
+        }
+        return ((length / 4) * 3) - padding;
+    }
+
+    private byte[] decodeZip(String base64Zip) {
+        try {
+            return Base64.getDecoder().decode(base64Zip);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalStateException("ZIP retornado pelo sandbox está corrompido (base64 inválido)", ex);
+        }
+    }
+
+    private String resolveZipFilename(UploadJobRecord record) {
+        return Optional.ofNullable(record.getResultZipFilename())
+            .filter(name -> !name.isBlank())
+            .orElse(record.getJobId() + "-resultado.zip");
+    }
+
+    private String sanitizeBase64(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private boolean isCompleted(String status) {
+        return status != null && "COMPLETED".equalsIgnoreCase(status.trim());
     }
 
     private UploadedApplicationDefaultCredential resolveApplicationDefaultCredentials(MultipartFile credentialFile) {
@@ -189,4 +292,6 @@ public class SandboxUploadService {
 
         return files;
     }
+
+    public record ResultZip(String filename, byte[] bytes) { }
 }

@@ -60,6 +60,9 @@ public class UploadJobRecord {
     @Column(name = "result_zip_filename")
     private String resultZipFilename;
 
+    @Column(name = "result_zip_ready")
+    private Boolean resultZipReady = Boolean.FALSE;
+
     @Column(name = "pull_request_url")
     private String pullRequestUrl;
 
@@ -189,6 +192,14 @@ public class UploadJobRecord {
 
     public void setResultZipFilename(String resultZipFilename) {
         this.resultZipFilename = resultZipFilename;
+    }
+
+    public Boolean getResultZipReady() {
+        return resultZipReady;
+    }
+
+    public void setResultZipReady(Boolean resultZipReady) {
+        this.resultZipReady = resultZipReady;
     }
 
     public String getPullRequestUrl() {

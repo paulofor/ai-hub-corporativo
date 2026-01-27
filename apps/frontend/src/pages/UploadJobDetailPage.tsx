@@ -63,12 +63,12 @@ export default function UploadJobDetailPage() {
     loadJob();
   }, [jobId, loadJob]);
 
-  const handleDownloadZip = () => {
+  const handleDownloadZip = async () => {
     if (!job) {
       return;
     }
     try {
-      downloadUploadJobZip(job);
+      await downloadUploadJobZip(job);
     } catch (err) {
       console.error('Falha ao preparar ZIP de resultado', err);
       pushToast('Não foi possível preparar o download do ZIP com os fontes gerados.');
@@ -90,7 +90,7 @@ export default function UploadJobDetailPage() {
   );
   const updatedAt = job?.updatedAt ?? job?.lastSyncedAt;
   const lastUpdatedLabel = updatedAt ? new Date(updatedAt).toLocaleString() : null;
-  const zipReady = Boolean(job?.resultZipBase64);
+  const zipReady = Boolean(job?.resultZipBase64 || job?.resultZipReady);
 
   const zipStatusMessage = (() => {
     if (!job) {
@@ -99,13 +99,15 @@ export default function UploadJobDetailPage() {
     if (job.status !== 'COMPLETED') {
       return 'O ZIP será liberado após a conclusão do job.';
     }
-    if (zipReady) {
+    if (job.resultZipBase64) {
       return job.resultZipFilename
         ? `ZIP pronto para download (${job.resultZipFilename}).`
         : 'ZIP pronto para download.';
     }
     if (job.resultZipReady) {
-      return 'O sandbox já concluiu o ZIP. Clique em “Atualizar status” para prepará-lo para download.';
+      return job.resultZipFilename
+        ? `ZIP pronto para download (${job.resultZipFilename}). Use o botão “Baixar ZIP”.`
+        : 'ZIP pronto para download. Use o botão “Baixar ZIP”.';
     }
     return 'O sandbox ainda está preparando o arquivo ZIP final.';
   })();

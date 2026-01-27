@@ -58,6 +58,8 @@ hub:
           input: 0.15 # US$ 0.15 por 1M de tokens de entrada
           cached-input: 0.06 # US$ 0.06 por 1M de tokens de entrada cacheados
           output: 0.60 # US$ 0.60 por 1M de tokens de saída
+  upload-jobs:
+    max-inline-zip-bytes: ${UPLOAD_JOBS_MAX_INLINE_ZIP_BYTES:8388608}
   logs:
     max-chars: 20000
 
