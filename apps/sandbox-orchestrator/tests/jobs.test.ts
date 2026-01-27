@@ -198,7 +198,7 @@ test('materializa chave SSH personalizada para jobs de upload', async () => {
 
   await (processor as any).materializeGitSshPrivateKey(job);
 
-  const keyPath = path.join(workspace, '.ssh', 'gitlab_key');
+  const keyPath = path.join(workspace, '.ssh', 'id_ed25519');
   const savedKey = await fs.readFile(keyPath, 'utf-8');
   assert.equal(savedKey, keyContent);
   assert.equal(job.gitSshKeyPath, keyPath);
