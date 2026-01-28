@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -321,9 +322,24 @@ public class SandboxUploadService {
         if (record.getTotalTokens() == null && breakdown.totalTokens() != null) {
             record.setTotalTokens(breakdown.totalTokens());
         }
-        if (record.getCost() == null && breakdown.totalCost() != null) {
-            record.setCost(breakdown.totalCost());
+
+        BigDecimal estimatedCost = breakdown.totalCost();
+        if (estimatedCost != null && hasAnyTokenData(breakdown)) {
+            if (record.getCost() == null || estimatedCost.compareTo(record.getCost()) != 0) {
+                record.setCost(estimatedCost);
+            }
         }
+    }
+
+    private boolean hasAnyTokenData(TokenCostBreakdown breakdown) {
+        Integer prompt = breakdown.inputTokens();
+        Integer cached = breakdown.cachedInputTokens();
+        Integer completion = breakdown.outputTokens();
+        Integer total = breakdown.totalTokens();
+        return (prompt != null && prompt > 0)
+            || (cached != null && cached > 0)
+            || (completion != null && completion > 0)
+            || (total != null && total > 0);
     }
 
     private String resolveDefaultModel(String uploadDefault, String codexDefault) {
