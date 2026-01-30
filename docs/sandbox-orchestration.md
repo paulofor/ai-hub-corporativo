@@ -18,6 +18,8 @@ A integração com o GPT-5-Codex agora segue o fluxo **Frontend → Backend → 
      - `run_shell(command: string[], cwd?: string)`
      - `read_file(path: string)`
      - `write_file(path: string, content: string)`
+     - `http_get(url: string, headers?: Record<string, string>)`
+       - Busca recursos públicos via HTTP GET (sem autenticação, bloqueando hosts locais/privados) para leitura de documentação ou material de apoio.
   3. Executa os `tool_calls` retornados pelo modelo, envia `tool_outputs` e repete até não restarem chamadas.
   4. Gera um diff unificado (`git diff`) e consolida `summary`, `changedFiles`, `patch` e `logs` antes de limpar o sandbox.
 - As tools validam caminhos para impedir acesso fora do diretório clonado e não repassam tokens externos para o modelo.
