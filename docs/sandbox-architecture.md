@@ -13,7 +13,7 @@ O fluxo de automação agora centraliza a execução das correções no `sandbox
 
 3. **Sandbox-orchestrator → Sandbox**
    - Para cada job é criado um diretório temporário exclusivo e o repositório é clonado na branch/commit solicitado.
-   - O serviço expõe tools controladas ao modelo (`run_shell`, `read_file`, `write_file`) e dispara o loop de tool-calling no modelo `gpt-5-codex` via Responses API.
+   - O serviço expõe tools controladas ao modelo (`run_shell`, `read_file`, `write_file`, `http_get`) e dispara o loop de tool-calling no modelo `gpt-5-codex` via Responses API.
    - Cada tool call é executada no sandbox (execução de comandos, leitura/escrita de arquivos) e o resultado é retornado ao modelo até o término da iteração.
 
 4. **Sandbox-orchestrator → Backend**
@@ -36,6 +36,7 @@ O fluxo de automação agora centraliza a execução das correções no `sandbox
 ## Ferramentas disponíveis no sandbox
 
 - O contêiner do sandbox agora inclui o utilitário `apply_patch` (wrapper para `patch`/`gpatch`) em `/usr/local/bin`. Ele aceita patches com o marcador `*** Begin Patch` ou diffs tradicionais, permitindo edições segmentadas sem reescrever arquivos completos.
+- A tool `http_get` permite que o modelo leia conteúdos públicos via HTTP GET, respeitando os bloqueios de hosts locais e privados e sem encaminhar cabeçalhos sensíveis.
 
 ## Upload de fontes via ZIP
 
