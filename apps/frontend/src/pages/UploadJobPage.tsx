@@ -1,9 +1,13 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import client from '../api/client';
 import { useToasts } from '../components/ToastContext';
 import {
+  buildJobTitle,
   downloadUploadJobZip,
+  getUploadJobStatusClassName,
   parseUploadJob,
+  resolveUploadJobTitle,
   UploadJob
 } from '../utils/uploadJobs';
 
@@ -42,7 +46,16 @@ export default function UploadJobPage() {
       const parsed = Array.isArray(response.data)
         ? response.data.map((item: unknown) => parseUploadJob(item))
         : [];
-      setJobs(parsed);
+      setJobs(
+        parsed.map((job) => ({
+          ...job,
+          title: resolveUploadJobTitle(
+            job.jobId,
+            job.title,
+            job.taskDescription ? buildJobTitle(job.taskDescription) : undefined
+          )
+        }))
+      );
       setJobsError(null);
     } catch (err) {
       setJobsError((err as Error).message);
@@ -117,7 +130,12 @@ export default function UploadJobPage() {
         headers: { 'Content-Type': 'multipart/form-data', ...ownerHeaders }
       });
       const parsed = parseUploadJob(response.data);
-      setJobs((current) => [parsed, ...current.filter((item) => item.jobId !== parsed.jobId)]);
+      const title = buildJobTitle(trimmedTask);
+      const enriched = { ...parsed, title };
+      setJobs((current) => [
+        enriched,
+        ...current.filter((item) => item.jobId !== parsed.jobId)
+      ]);
       setTaskDescription('');
       setTestCommand('');
       setFile(null);
@@ -133,6 +151,38 @@ export default function UploadJobPage() {
     }
   };
 
+  const refreshJob = async (jobId: string) => {
+    try {
+      const response = await client.get(`/upload-jobs/${jobId}?refresh=true`);
+      if (!response.data) {
+        pushToast('Job não encontrado no sandbox.');
+        return;
+      }
+      const parsed = parseUploadJob(response.data);
+      const responseJobId = parsed.jobId || jobId;
+      setJobs((current) =>
+        current.map((job) =>
+          job.jobId === jobId
+            ? {
+                ...job,
+                ...parsed,
+                jobId: responseJobId,
+                title: resolveUploadJobTitle(
+                  responseJobId,
+                  job.title,
+                  parsed.title,
+                  parsed.taskDescription ? buildJobTitle(parsed.taskDescription) : undefined
+                )
+              }
+            : job
+        )
+      );
+    } catch (err) {
+      console.warn(`Falha ao atualizar job ${jobId}`, err);
+      pushToast('Não foi possível atualizar o status do job. Tente novamente.');
+    }
+  };
+
   const handleDownloadZip = async (job: UploadJob) => {
     try {
       await downloadUploadJobZip(job);
@@ -142,15 +192,8 @@ export default function UploadJobPage() {
     }
   };
 
-  const jobsToShow = useMemo(() => {
-    return [...jobs]
-      .sort(
-        (jobA, jobB) =>
-          (jobB.updatedAt ?? jobB.createdAt ?? jobB.lastSyncedAt ?? 0) -
-          (jobA.updatedAt ?? jobA.createdAt ?? jobA.lastSyncedAt ?? 0)
-      )
-      .slice(0, 5);
-  }, [jobs]);
+  const currencyFormatter = useMemo(() => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'USD' }), []);
+  const formatCost = (value?: number) => (value != null ? currencyFormatter.format(value) : '—');
 
   return (
     <section className="space-y-6">
@@ -366,13 +409,40 @@ export default function UploadJobPage() {
           )}
           {!jobsLoaded ? (
             <p className="text-sm text-slate-500">Carregando lista de jobs...</p>
-          ) : jobsToShow.length === 0 ? (
+          ) : jobs.length === 0 ? (
             <p className="text-sm text-slate-500">Nenhum job criado recentemente.</p>
           ) : (
             <div className="space-y-4">
-              {jobsToShow.map((job) => {
+              {jobs.map((job) => {
+                const title = resolveUploadJobTitle(job.jobId, job.title, job.taskDescription ? buildJobTitle(job.taskDescription) : undefined);
+                const updatedAt = job.updatedAt ?? job.lastSyncedAt;
+                const lastUpdatedLabel = updatedAt ? new Date(updatedAt).toLocaleString() : null;
+                const costLabel = formatCost(job.cost);
                 return (
                   <div key={job.jobId} className="rounded border border-slate-200 dark:border-slate-800 p-3 text-sm">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold">{title}</p>
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${getUploadJobStatusClassName(job.status)}`}>
+                            {job.status}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          ID: {job.jobId}
+                          {lastUpdatedLabel && <> • Atualizado em {lastUpdatedLabel}</>}
+                          <> • Custo estimado: {costLabel}</>
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-emerald-700">
+                        <button type="button" onClick={() => refreshJob(job.jobId)} className="hover:underline">
+                          Atualizar
+                        </button>
+                        <Link to={`/upload-jobs/${job.jobId}`} className="text-emerald-700 hover:underline dark:text-emerald-300">
+                          Ver detalhes
+                        </Link>
+                      </div>
+                    </div>
                     {job.summary && (
                       <div className="mt-2">
                         <p className="text-xs font-semibold text-slate-600 dark:text-slate-200">Resumo</p>
