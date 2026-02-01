@@ -75,6 +75,20 @@ export default function UploadJobDetailPage() {
     }
   };
 
+  const handleCopyDescription = async () => {
+    if (!job?.taskDescription) {
+      pushToast('Nenhuma descrição disponível para copiar.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(job.taskDescription);
+      pushToast('Descrição copiada.');
+    } catch (err) {
+      console.error('Falha ao copiar descrição do job', err);
+      pushToast('Não foi possível copiar a descrição.');
+    }
+  };
+
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'USD' }),
     []
@@ -164,6 +178,27 @@ export default function UploadJobDetailPage() {
 
       {job ? (
         <div className="space-y-6">
+          <div className="rounded-xl border border-slate-200 bg-white/70 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-lg font-semibold">Descrição da tarefa</h3>
+              <button
+                type="button"
+                onClick={handleCopyDescription}
+                disabled={!job.taskDescription}
+                className="rounded-md border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Copiar descrição
+              </button>
+            </div>
+            {job.taskDescription ? (
+              <pre className="mt-3 whitespace-pre-wrap rounded-md bg-slate-100 p-4 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                {job.taskDescription}
+              </pre>
+            ) : (
+              <p className="mt-2 text-sm text-slate-500">Nenhuma descrição foi enviada para este job.</p>
+            )}
+          </div>
+
           <div className="rounded-xl border border-slate-200 bg-white/70 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
             <h3 className="text-lg font-semibold">Resumo do processamento</h3>
             {job.summary ? (
