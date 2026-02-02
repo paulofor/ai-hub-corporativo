@@ -132,7 +132,12 @@ public class SandboxUploadService {
         if (refresh) {
             SandboxOrchestratorClient.SandboxOrchestratorJobResponse orchestratorResponse =
                 sandboxOrchestratorClient.getJob(jobId);
-            populateFromOrchestrator(record, orchestratorResponse);
+            if (orchestratorResponse == null) {
+                record.setStatus("FAILED");
+                record.setError("Job não encontrado no sandbox-orchestrator");
+            } else {
+                populateFromOrchestrator(record, orchestratorResponse);
+            }
             record.setUpdatedAt(Instant.now());
             uploadJobRepository.save(record);
         }
