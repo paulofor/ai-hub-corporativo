@@ -165,6 +165,39 @@ export function createApp(options: AppOptions = {}) {
     const normalized = value.trim().toUpperCase();
     return normalized === 'ECONOMY' ? 'ECONOMY' : 'STANDARD';
   };
+  const jobStaleTimeoutMs = (() => {
+    const raw = Number(process.env.JOB_STALE_TIMEOUT_MS);
+    if (Number.isFinite(raw) && raw > 0) {
+      return raw;
+    }
+    return 6 * 60 * 60 * 1000;
+  })();
+
+  const resolveTimestamp = (value?: string): number | null => {
+    if (!value) {
+      return null;
+    }
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  };
+
+  const markStaleJobIfNeeded = (job: SandboxJob) => {
+    if (job.status !== 'RUNNING') {
+      return;
+    }
+    const updatedAt = resolveTimestamp(job.updatedAt);
+    if (!updatedAt) {
+      return;
+    }
+    const now = Date.now();
+    if (now - updatedAt <= jobStaleTimeoutMs) {
+      return;
+    }
+    job.status = 'FAILED';
+    job.error = 'Job ficou em execução por tempo demais e foi marcado como falho.';
+    job.updatedAt = new Date(now).toISOString();
+    job.logs.push(`[${job.updatedAt}] job expirou após ${Math.round(jobStaleTimeoutMs / 60000)} minutos`);
+  };
 
   const app = express();
   if (process.env.NODE_ENV !== 'test') {
@@ -287,6 +320,7 @@ export function createApp(options: AppOptions = {}) {
     if (!job) {
       return res.status(404).json({ error: 'job not found' });
     }
+    markStaleJobIfNeeded(job);
     res.json(job);
   });
 
