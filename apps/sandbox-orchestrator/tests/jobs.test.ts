@@ -216,7 +216,77 @@ test('materializa chave SSH personalizada para jobs de upload', async () => {
   await fs.rm(workspace, { recursive: true, force: true });
 });
 
+test('processamento de upload materializa credenciais e chave SSH no workspace', async () => {
+  const zip = new AdmZip();
+  zip.addFile('README.md', Buffer.from('conteúdo com credenciais'));
 
+  const fakeOpenAI = {
+    responses: {
+      create: async () => ({
+        output: [
+          {
+            type: 'message',
+            id: 'msg-upload-creds',
+            role: 'assistant',
+            status: 'completed',
+            content: [{ type: 'output_text', text: 'ok', annotations: [] }],
+          },
+        ],
+      }),
+    },
+  } as any;
+
+  const processor = new SandboxJobProcessor(undefined, 'gpt-5-codex', fakeOpenAI);
+  (processor as any).cleanup = async () => {};
+
+  const credentialContent = '{"type":"service_account","project_id":"upload-demo"}';
+  const sshKeyContent = '-----BEGIN OPENSSH PRIVATE KEY-----\nUPLOADKEYDATA';
+
+  const now = new Date().toISOString();
+  const job: SandboxJob = {
+    jobId: 'job-upload-creds',
+    repoUrl: 'upload://job-upload-creds',
+    branch: 'upload',
+    taskDescription: 'validar credenciais',
+    status: 'PENDING',
+    logs: [],
+    createdAt: now,
+    updatedAt: now,
+    uploadedZip: { base64: zip.toBuffer().toString('base64'), filename: 'fontes.zip' },
+    applicationDefaultCredentials: {
+      base64: Buffer.from(credentialContent).toString('base64'),
+      filename: 'application_default_credentials.json',
+    },
+    gitSshPrivateKey: { base64: Buffer.from(sshKeyContent).toString('base64'), filename: 'gitlab_key' },
+  } as SandboxJob;
+
+  await processor.process(job);
+
+  assert.ok(job.sandboxPath, 'sandboxPath deve ser preenchido após o processamento');
+  const gcpPath = job.gcpCredentialsPath!;
+  const sshPath = job.gitSshKeyPath!;
+
+  const savedCreds = await fs.readFile(gcpPath, 'utf-8');
+  const savedKey = await fs.readFile(sshPath, 'utf-8');
+
+  assert.equal(savedCreds, credentialContent);
+  assert.equal(savedKey, sshKeyContent);
+  assert.equal(path.basename(gcpPath), 'application_default_credentials.json');
+  assert.equal(path.basename(sshPath), 'id_ed25519');
+
+  const repoPathUpload = path.join(job.sandboxPath!, 'repo');
+  const envCheck = await (processor as any).handleRunShell(
+    { command: ['sh', '-c', 'echo $GOOGLE_APPLICATION_CREDENTIALS && echo $GIT_SSH_COMMAND'], cwd: '.' },
+    repoPathUpload,
+    job,
+  );
+
+  const [credentialsEnv, gitEnv] = envCheck.stdout.trim().split('\n');
+  assert.equal(credentialsEnv, gcpPath);
+  assert.ok(gitEnv.includes(sshPath));
+
+  await fs.rm(job.sandboxPath!, { recursive: true, force: true });
+});
 test('respects SANDBOX_WORKDIR when creating workspaces', async () => {
   const originalWorkdir = process.env.SANDBOX_WORKDIR;
   const customBase = await fs.mkdtemp(path.join(os.tmpdir(), 'sandbox-custom-base-'));
