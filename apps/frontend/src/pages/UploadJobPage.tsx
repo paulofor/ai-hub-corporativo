@@ -461,12 +461,6 @@ export default function UploadJobPage() {
                         </Link>
                       </div>
                     </div>
-                    {job.summary && (
-                      <div className="mt-2">
-                        <p className="text-xs font-semibold text-slate-600 dark:text-slate-200">Resumo</p>
-                        <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{job.summary}</p>
-                      </div>
-                    )}
                     {job.error && (
                       <p className="mt-2 text-xs text-red-600">Erro: {job.error}</p>
                     )}
