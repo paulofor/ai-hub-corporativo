@@ -9,12 +9,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StreamUtils;
 import org.springframework.web.client.RestClient;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -134,64 +136,84 @@ public class SandboxOrchestratorClient {
         return requestSpec.exchange((request, response) -> {
             HttpStatusCode status = response.getStatusCode();
             MediaType contentType = response.getHeaders().getContentType();
-            String body = readBody(response);
 
             if (allowNotFound && status.value() == 404) {
                 log.warn("Job não encontrado no sandbox-orchestrator (operação: {})", operationDescription);
+                discardBody(response);
                 return null;
             }
 
             if (!status.is2xxSuccessful()) {
+                String body = readBodyForLog(response);
                 logIfNeeded(status, contentType, body);
                 throw new IllegalStateException(buildErrorMessage(status, contentType));
             }
 
             if (!isJsonContentType(contentType)) {
+                String body = readBodyForLog(response);
                 logIfNeeded(status, contentType, body);
                 throw new IllegalStateException(buildErrorMessage(status, contentType));
             }
 
-            if (body == null || body.isBlank()) {
-                logIfNeeded(status, contentType, body);
-                throw new IllegalStateException("sandbox-orchestrator retornou " + status.value() + " com corpo vazio");
-            }
-
-            if (!looksLikeJson(body)) {
-                logIfNeeded(status, contentType, body);
-                throw new IllegalStateException("sandbox-orchestrator retornou " + status.value()
-                    + " com corpo inválido (JSON esperado)");
-            }
-
-            return readJsonTree(body, status, contentType);
+            return readJsonTree(response, status, contentType);
         });
     }
 
-    private String readBody(RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse response) {
-        try {
-            return StreamUtils.copyToString(response.getBody(), StandardCharsets.UTF_8);
+    private void discardBody(RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse response) {
+        try (InputStream body = response.getBody()) {
+            if (body == null) {
+                return;
+            }
+            body.transferTo(OutputStream.nullOutputStream());
+        } catch (IOException ignored) {
+            // noop
+        }
+    }
+
+    private String readBodyForLog(RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse response) {
+        int maxLength = MAX_LOG_BODY_LENGTH + 1;
+        try (InputStream body = response.getBody()) {
+            if (body == null) {
+                return "";
+            }
+            byte[] buffer = new byte[1024];
+            int total = 0;
+            int read;
+            byte[] data = new byte[0];
+            while ((read = body.read(buffer)) != -1 && total < maxLength) {
+                int remaining = maxLength - total;
+                int chunk = Math.min(read, remaining);
+                int nextTotal = total + chunk;
+                if (nextTotal > data.length) {
+                    data = Arrays.copyOf(data, Math.max(nextTotal, data.length + 1024));
+                }
+                System.arraycopy(buffer, 0, data, total, chunk);
+                total = nextTotal;
+            }
+            return new String(data, 0, total, StandardCharsets.UTF_8);
+        } catch (IOException ex) {
+            return "";
+        }
+    }
+
+    private JsonNode readJsonTree(RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse response,
+                                  HttpStatusCode status,
+                                  MediaType contentType) {
+        try (InputStream body = response.getBody()) {
+            if (body == null) {
+                throw new IllegalStateException("sandbox-orchestrator retornou " + status.value() + " com corpo vazio");
+            }
+            JsonNode node = objectMapper.readTree(body);
+            if (node == null || node.isMissingNode()) {
+                throw new IllegalStateException("sandbox-orchestrator retornou " + status.value() + " com corpo vazio");
+            }
+            return node;
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("sandbox-orchestrator retornou " + status.value()
+                + " com corpo inválido (JSON esperado)", ex);
         } catch (IOException ex) {
             throw new IllegalStateException("Falha ao ler resposta do sandbox-orchestrator", ex);
         }
-    }
-
-    private JsonNode readJsonTree(String body, HttpStatusCode status, MediaType contentType) {
-        try {
-            return objectMapper.readTree(body);
-        } catch (JsonProcessingException ex) {
-            logIfNeeded(status, contentType, body);
-            throw new IllegalStateException("sandbox-orchestrator retornou " + status.value()
-                + " com corpo inválido (JSON esperado)", ex);
-        }
-    }
-
-    private boolean looksLikeJson(String body) {
-        String trimmed = body.trim();
-        if (trimmed.isEmpty()) {
-            return false;
-        }
-        char first = trimmed.charAt(0);
-        char last = trimmed.charAt(trimmed.length() - 1);
-        return (first == '{' && last == '}') || (first == '[' && last == ']');
     }
 
     private void logIfNeeded(HttpStatusCode status, MediaType contentType, String body) {
