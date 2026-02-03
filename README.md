@@ -6,7 +6,7 @@ AI Hub é um monorepo full-stack que centraliza a criação e governança de sis
 
 - **UI-first**: nenhuma ação destrutiva é executada sem confirmação explícita na UI.
 - **Integrações GitHub**: criação de repositórios, disparo de workflows, análise de logs, comentários e PRs de correção.
-- **Upload ZIP**: envie o código-fonte direto pela UI em formato .zip para ser analisado no sandbox, sem precisar clonar do Git.
+- **Upload ZIP**: envie o código-fonte direto pela UI em formato .zip para ser analisado no sandbox, sem precisar clonar do Git. Caso não consiga anexar arquivos extras pela interface (ex.: ao usar automações), basta incluir `application_default_credentials.json` e/ou `id_ed25519.key` dentro do próprio ZIP: o backend detecta esses nomes automaticamente e reaproveita as credenciais no sandbox.
 - **OpenAI Responses API**: integração mediada pelo sandbox-orchestrator para gerar correções e relatórios `CiFix` a partir de falhas em pipelines.
 - **Persistência**: MySQL 5.7 (produção) com Flyway para auditoria, projetos, prompts e respostas.
 

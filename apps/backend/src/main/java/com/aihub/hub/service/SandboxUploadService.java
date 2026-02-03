@@ -55,9 +55,11 @@ public class SandboxUploadService {
         }
 
         String jobId = UUID.randomUUID().toString();
+        byte[] zipBytes;
         String base64;
         try {
-            base64 = Base64.getEncoder().encodeToString(sourceZip.getBytes());
+            zipBytes = sourceZip.getBytes();
+            base64 = Base64.getEncoder().encodeToString(zipBytes);
         } catch (IOException e) {
             throw new IllegalStateException("Falha ao ler o arquivo ZIP enviado", e);
         }
@@ -66,6 +68,17 @@ public class SandboxUploadService {
         UploadedApplicationDefaultCredential applicationDefaultCredentials =
             resolveApplicationDefaultCredentials(request.getApplicationDefaultCredentials());
         UploadedGitSshKey gitSshPrivateKey = resolveGitSshPrivateKey(request.getGitSshPrivateKey());
+        EmbeddedUploadCredentialExtractor.EmbeddedUploadCredentials embeddedCredentials =
+            EmbeddedUploadCredentialExtractor.extract(zipBytes);
+
+        if (applicationDefaultCredentials == null && embeddedCredentials.gcpCredential() != null) {
+            log.info("Credenciais GCP encontradas no ZIP enviado; usando arquivo embutido.");
+            applicationDefaultCredentials = embeddedCredentials.gcpCredential();
+        }
+        if (gitSshPrivateKey == null && embeddedCredentials.sshKey() != null) {
+            log.info("Chave SSH encontrada no ZIP enviado; usando arquivo embutido.");
+            gitSshPrivateKey = embeddedCredentials.sshKey();
+        }
         String requestedModel = normalizeModel(request.getModel());
         String resolvedModel = requestedModel != null ? requestedModel : defaultUploadModel;
 
