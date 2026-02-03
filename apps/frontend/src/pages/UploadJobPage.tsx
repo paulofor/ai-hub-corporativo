@@ -85,7 +85,25 @@ export default function UploadJobPage() {
 
   const handleProblemFilesChange = (event: ChangeEvent<HTMLInputElement>) => {
     const selection = event.target.files ? Array.from(event.target.files) : [];
-    setProblemFiles(selection);
+    if (selection.length === 0) {
+      return;
+    }
+    setProblemFiles((current) => {
+      const next = [...current];
+      selection.forEach((fileItem) => {
+        const exists = next.some(
+          (existing) =>
+            existing.name === fileItem.name &&
+            existing.size === fileItem.size &&
+            existing.lastModified === fileItem.lastModified
+        );
+        if (!exists) {
+          next.push(fileItem);
+        }
+      });
+      return next;
+    });
+    event.target.value = '';
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -228,8 +246,8 @@ export default function UploadJobPage() {
               Arquivos da solicitação (docs, imagens, logs, ZIP de fontes, etc.)
             </label>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Envie documentos, imagens, arquivos de apoio ou um ZIP com fontes de programas; eles ficarão disponíveis
-              no sandbox junto com o código.
+              Envie documentos, imagens, arquivos de apoio ou um ZIP com fontes de programas; todos ficarão disponíveis
+              no sandbox junto com o código. Você pode selecionar vários arquivos de uma vez ou adicionar mais depois.
             </p>
             <input
               type="file"
