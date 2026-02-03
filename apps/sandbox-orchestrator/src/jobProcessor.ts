@@ -141,7 +141,7 @@ export class SandboxJobProcessor implements JobProcessor {
         const cloneUrl = buildAuthRepoUrl(job.repoUrl, githubAuth.token, githubAuth.username);
         this.log(job, `clonando repositório ${redactUrlCredentials(cloneUrl)} (branch ${job.branch})`);
         await this.cloneRepository(job, repoPath, cloneUrl);
-        baseCommit = await this.getHeadCommit(repoPath);
+        baseCommit = await this.getHeadCommit(job, repoPath);
       }
 
       await this.materializeProblemFiles(job, repoPath);
@@ -153,8 +153,8 @@ export class SandboxJobProcessor implements JobProcessor {
       this.log(job, `iniciando interação com o modelo do sandbox (${resolvedModel})`);
       const summary = await this.runCodexLoop(job, repoPath, resolvedModel);
       job.summary = summary;
-      job.changedFiles = await this.collectChangedFiles(repoPath, baseCommit);
-      job.patch = await this.generatePatch(repoPath, baseCommit);
+      job.changedFiles = await this.collectChangedFiles(job, repoPath, baseCommit);
+      job.patch = await this.generatePatch(job, repoPath, baseCommit);
       if (isUpload) {
         await this.attachResultZip(job, repoPath);
       }
@@ -210,6 +210,33 @@ export class SandboxJobProcessor implements JobProcessor {
       return job.sandboxPath;
     }
     return process.env.HOME ?? os.homedir();
+  }
+
+  private buildJobEnv(job: SandboxJob): NodeJS.ProcessEnv {
+    const homeDir = this.resolveHomeDir(job);
+    const env: NodeJS.ProcessEnv = { ...process.env };
+    if (homeDir) {
+      env.HOME = homeDir;
+    }
+
+    if (job.gitSshKeyPath) {
+      env.GIT_SSH_COMMAND = `ssh -i ${job.gitSshKeyPath} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no`;
+    }
+
+    const credentialsPath = job.gcpCredentialsPath;
+    if (credentialsPath) {
+      env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
+      env.CLOUDSDK_CONFIG = path.dirname(credentialsPath);
+    } else if (homeDir) {
+      env.CLOUDSDK_CONFIG = path.join(homeDir, '.config', 'gcloud');
+    }
+
+    return env;
+  }
+
+  private async execWithJobEnv(command: string, options: { cwd?: string } = {}, job?: SandboxJob) {
+    const env = job ? this.buildJobEnv(job) : process.env;
+    return exec(command, { ...options, env });
   }
 
   private sanitizeCredentialFilename(name: string | undefined): string {
@@ -347,10 +374,10 @@ ${block}` : block;
   }
 
   private async cloneRepository(job: SandboxJob, repoPath: string, cloneUrl: string): Promise<void> {
-    await exec(`git clone --branch ${job.branch} --depth 1 ${cloneUrl} ${repoPath}`);
+    await this.execWithJobEnv(`git clone --branch ${job.branch} --depth 1 ${cloneUrl} ${repoPath}`, {}, job);
     if (job.commitHash) {
       this.log(job, `checando commit ${job.commitHash}`);
-      await exec(`git checkout ${job.commitHash}`, { cwd: repoPath });
+      await this.execWithJobEnv(`git checkout ${job.commitHash}`, { cwd: repoPath }, job);
     }
   }
 
@@ -416,20 +443,20 @@ ${block}` : block;
 
   private async initializeGitFromUpload(job: SandboxJob, repoPath: string): Promise<string | undefined> {
     try {
-      await exec('git init', { cwd: repoPath });
-      await exec('git config user.email "ai-hub-upload@example.com"', { cwd: repoPath });
-      await exec('git config user.name "AI Hub Upload"', { cwd: repoPath });
+      await this.execWithJobEnv('git init', { cwd: repoPath }, job);
+      await this.execWithJobEnv('git config user.email "ai-hub-upload@example.com"', { cwd: repoPath }, job);
+      await this.execWithJobEnv('git config user.name "AI Hub Upload"', { cwd: repoPath }, job);
       const branch = job.branch ?? 'upload';
-      await exec(`git checkout -B ${branch}`, { cwd: repoPath });
-      await exec('git add -A', { cwd: repoPath });
+      await this.execWithJobEnv(`git checkout -B ${branch}`, { cwd: repoPath }, job);
+      await this.execWithJobEnv('git add -A', { cwd: repoPath }, job);
       try {
-        await exec('git commit -m "Initial upload"', { cwd: repoPath });
+        await this.execWithJobEnv('git commit -m "Initial upload"', { cwd: repoPath }, job);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         this.log(job, `nenhum commit inicial criado: ${message}`);
       }
 
-      return await this.getHeadCommit(repoPath);
+      return await this.getHeadCommit(job, repoPath);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.log(job, `falha ao inicializar git para upload: ${message}`);
@@ -1020,18 +1047,7 @@ Modo econômico ativo: minimize leituras extensas, priorize comandos curtos, esc
     let stderrTruncated = false;
     let timedOut = false;
 
-    const homeDir = this.resolveHomeDir(job);
-    const env: NodeJS.ProcessEnv = { ...process.env, HOME: homeDir };
-    const credentialsPath = job.gcpCredentialsPath;
-    if (job.gitSshKeyPath) {
-      env.GIT_SSH_COMMAND = `ssh -i ${job.gitSshKeyPath} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no`;
-    }
-    if (credentialsPath) {
-      env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
-      env.CLOUDSDK_CONFIG = path.dirname(credentialsPath);
-    } else if (homeDir) {
-      env.CLOUDSDK_CONFIG = path.join(homeDir, '.config', 'gcloud');
-    }
+    const env = this.buildJobEnv(job);
 
     const child = spawn(command[0], command.slice(1), { cwd, env });
 
@@ -1119,13 +1135,13 @@ Modo econômico ativo: minimize leituras extensas, priorize comandos curtos, esc
     return { status: 'ok', path: relative, content };
   }
 
-  private async collectChangedFiles(repoPath: string, baseCommit?: string): Promise<string[]> {
+  private async collectChangedFiles(job: SandboxJob, repoPath: string, baseCommit?: string): Promise<string[]> {
     if (!(await this.isGitRepository(repoPath))) {
       return [];
     }
 
     try {
-      const { stdout } = await exec(`git diff --name-only ${baseCommit ?? 'HEAD'}`, { cwd: repoPath });
+      const { stdout } = await this.execWithJobEnv(`git diff --name-only ${baseCommit ?? 'HEAD'}`, { cwd: repoPath }, job);
       return stdout
         .split('\n')
         .map((line) => line.trim())
@@ -1135,12 +1151,12 @@ Modo econômico ativo: minimize leituras extensas, priorize comandos curtos, esc
     }
   }
 
-  private async generatePatch(repoPath: string, baseCommit?: string): Promise<string> {
+  private async generatePatch(job: SandboxJob, repoPath: string, baseCommit?: string): Promise<string> {
     if (!(await this.isGitRepository(repoPath))) {
       return '';
     }
     try {
-      const { stdout } = await exec(`git diff ${baseCommit ?? 'HEAD'}`, { cwd: repoPath });
+      const { stdout } = await this.execWithJobEnv(`git diff ${baseCommit ?? 'HEAD'}`, { cwd: repoPath }, job);
       return stdout;
     } catch {
       return '';
@@ -1224,12 +1240,12 @@ Modo econômico ativo: minimize leituras extensas, priorize comandos curtos, esc
     return undefined;
   }
 
-  private async getHeadCommit(repoPath: string): Promise<string | undefined> {
+  private async getHeadCommit(job: SandboxJob, repoPath: string): Promise<string | undefined> {
     if (!(await this.isGitRepository(repoPath))) {
       return undefined;
     }
     try {
-      const { stdout } = await exec('git rev-parse HEAD', { cwd: repoPath });
+      const { stdout } = await this.execWithJobEnv('git rev-parse HEAD', { cwd: repoPath }, job);
       return stdout.trim();
     } catch {
       return undefined;
@@ -1265,7 +1281,7 @@ Modo econômico ativo: minimize leituras extensas, priorize comandos curtos, esc
       return;
     }
 
-    const diff = diffPatch ?? (await this.generatePatch(repoPath, baseCommit));
+    const diff = diffPatch ?? (await this.generatePatch(job, repoPath, baseCommit));
     if (!diff.trim()) {
       this.log(job, 'nenhuma alteração detectada; PR não será criado');
       return;
@@ -1273,20 +1289,20 @@ Modo econômico ativo: minimize leituras extensas, priorize comandos curtos, esc
 
     const branchName = `ai-hub-corporativo/cifix-${job.jobId}`;
     try {
-      await exec('git config user.email "ai-hub-corporativo-bot@example.com"', { cwd: repoPath });
-      await exec('git config user.name "AI Hub Bot"', { cwd: repoPath });
-      await exec(`git checkout -B ${branchName}`, { cwd: repoPath });
-      await exec('git add -A', { cwd: repoPath });
-      await exec('git commit -m "AI Hub automated fix"', { cwd: repoPath });
+      await this.execWithJobEnv('git config user.email "ai-hub-corporativo-bot@example.com"', { cwd: repoPath }, job);
+      await this.execWithJobEnv('git config user.name "AI Hub Bot"', { cwd: repoPath }, job);
+      await this.execWithJobEnv(`git checkout -B ${branchName}`, { cwd: repoPath }, job);
+      await this.execWithJobEnv('git add -A', { cwd: repoPath }, job);
+      await this.execWithJobEnv('git commit -m "AI Hub automated fix"', { cwd: repoPath }, job);
 
       const authenticatedRemote = buildAuthRepoUrl(
         job.repoUrl,
         token,
         githubAuth.username,
       );
-      await exec(`git remote set-url origin ${authenticatedRemote}`, { cwd: repoPath });
+      await this.execWithJobEnv(`git remote set-url origin ${authenticatedRemote}`, { cwd: repoPath }, job);
       try {
-        await exec(`git push origin ${branchName}`, { cwd: repoPath });
+        await this.execWithJobEnv(`git push origin ${branchName}`, { cwd: repoPath }, job);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         const hint = this.permissionHintFromMessage(message);
