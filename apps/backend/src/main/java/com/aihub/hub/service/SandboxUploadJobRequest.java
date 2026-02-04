@@ -14,6 +14,7 @@ public record SandboxUploadJobRequest(
     String branch,
     List<UploadedProblemFile> problemFiles,
     UploadedApplicationDefaultCredential applicationDefaultCredentials,
-    UploadedGitSshKey gitSshPrivateKey
+    UploadedGitSshKey gitSshPrivateKey,
+    UploadedGitlabPersonalAccessToken gitlabPersonalAccessToken
 ) {
 }

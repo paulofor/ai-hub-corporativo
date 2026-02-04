@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 import { SandboxJobProcessor } from './jobProcessor.js';
-import { JobProcessor, SandboxJob, SandboxProfile, UploadedApplicationDefaultCredential, UploadedGitSshPrivateKey, UploadedProblemFile } from './types.js';
+import { JobProcessor, SandboxJob, SandboxProfile, UploadedApplicationDefaultCredential, UploadedGitSshPrivateKey, UploadedGitlabPersonalAccessToken, UploadedProblemFile } from './types.js';
 
 interface AppOptions {
   jobRegistry?: Map<string, SandboxJob>;
@@ -146,6 +146,21 @@ function parseGitSshPrivateKey(raw: unknown): UploadedGitSshPrivateKey | undefin
   return { base64, filename: filename ?? undefined };
 }
 
+function parseGitlabPersonalAccessToken(raw: unknown): UploadedGitlabPersonalAccessToken | undefined {
+  if (!raw || typeof raw !== 'object') {
+    return undefined;
+  }
+
+  const payload = raw as Record<string, unknown>;
+  const base64 = validateString(payload['base64']);
+  if (!base64) {
+    return undefined;
+  }
+
+  const filename = validateString(payload['filename']);
+  return { base64, filename: filename ?? undefined };
+}
+
 export function createApp(options: AppOptions = {}) {
   const jobRegistry = options.jobRegistry ?? new Map<string, SandboxJob>();
   logVolumeMappings();
@@ -252,6 +267,7 @@ export function createApp(options: AppOptions = {}) {
     const problemFiles = parseProblemFiles(req.body?.problemFiles);
     const applicationDefaultCredentials = parseApplicationDefaultCredentials(req.body?.applicationDefaultCredentials);
     const gitSshPrivateKey = parseGitSshPrivateKey(req.body?.gitSshPrivateKey);
+    const gitlabPersonalAccessToken = parseGitlabPersonalAccessToken(req.body?.gitlabPersonalAccessToken);
 
     const isUpload = Boolean(uploadedZipBase64);
     const resolvedBranch = branch ?? (isUpload ? 'upload' : undefined);
@@ -292,6 +308,7 @@ export function createApp(options: AppOptions = {}) {
       uploadedZip: isUpload ? { base64: uploadedZipBase64!, filename: uploadedZipName ?? undefined } : undefined,
       applicationDefaultCredentials: applicationDefaultCredentials ?? undefined,
       gitSshPrivateKey: gitSshPrivateKey ?? undefined,
+      gitlabPersonalAccessToken: gitlabPersonalAccessToken ?? undefined,
       problemFiles: problemFiles.length ? problemFiles : undefined,
       status: 'PENDING',
       logs: [],
