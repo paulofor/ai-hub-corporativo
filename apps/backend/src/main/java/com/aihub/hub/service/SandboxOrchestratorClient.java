@@ -112,6 +112,14 @@ public class SandboxOrchestratorClient {
             body.put("gitSshPrivateKey", gitKey);
         }
 
+        if (request.gitlabPersonalAccessToken() != null) {
+            Map<String, Object> gitlabPat = new HashMap<>();
+            gitlabPat.put("base64", request.gitlabPersonalAccessToken().base64());
+            Optional.ofNullable(request.gitlabPersonalAccessToken().filename())
+                .ifPresent(value -> gitlabPat.put("filename", value));
+            body.put("gitlabPersonalAccessToken", gitlabPat);
+        }
+
         log.info("Enviando job {} (upload) para sandbox-orchestrator no path {}", request.jobId(), jobsPath);
         JsonNode response = executeForJsonResponse(restClient.post()
             .uri(jobsPath)

@@ -66,6 +66,7 @@ public class SandboxUploadService {
         UploadedApplicationDefaultCredential applicationDefaultCredentials =
             resolveApplicationDefaultCredentials(request.getApplicationDefaultCredentials());
         UploadedGitSshKey gitSshPrivateKey = resolveGitSshPrivateKey(request.getGitSshPrivateKey());
+        UploadedGitlabPersonalAccessToken gitlabPersonalAccessToken = resolveGitlabPersonalAccessToken(request.getGitlabPersonalAccessToken());
         String requestedModel = normalizeModel(request.getModel());
         String resolvedModel = requestedModel != null ? requestedModel : defaultUploadModel;
 
@@ -81,7 +82,8 @@ public class SandboxUploadService {
             "upload",
             problemFiles,
             applicationDefaultCredentials,
-            gitSshPrivateKey
+            gitSshPrivateKey,
+            gitlabPersonalAccessToken
         );
 
         UploadJobRecord record = new UploadJobRecord();
@@ -277,6 +279,25 @@ public class SandboxUploadService {
             );
         } catch (IOException e) {
             throw new IllegalStateException("Falha ao ler a chave privada SSH enviada", e);
+        }
+    }
+
+    private UploadedGitlabPersonalAccessToken resolveGitlabPersonalAccessToken(MultipartFile tokenFile) {
+        if (tokenFile == null || tokenFile.isEmpty()) {
+            return null;
+        }
+
+        String filename = Optional.ofNullable(tokenFile.getOriginalFilename())
+            .filter(name -> !name.isBlank())
+            .orElse("gitlab_pat.key");
+
+        try {
+            return new UploadedGitlabPersonalAccessToken(
+                filename,
+                Base64.getEncoder().encodeToString(tokenFile.getBytes())
+            );
+        } catch (IOException e) {
+            throw new IllegalStateException("Falha ao ler o token do GitLab enviado", e);
         }
     }
 

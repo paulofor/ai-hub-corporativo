@@ -145,6 +145,7 @@ export class SandboxJobProcessor implements JobProcessor {
       }
 
       await this.materializeProblemFiles(job, repoPath);
+      await this.materializeGitlabPersonalAccessToken(job, repoPath);
 
       if (!this.openai) {
         throw new Error('OPENAI_API_KEY não configurada no sandbox orchestrator');
@@ -221,6 +222,11 @@ export class SandboxJobProcessor implements JobProcessor {
 
     if (job.gitSshKeyPath) {
       env.GIT_SSH_COMMAND = `ssh -i ${job.gitSshKeyPath} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no`;
+    }
+    if (job.gitlabPatValue) {
+      env.GITLAB_PERSONAL_ACCESS_TOKEN = job.gitlabPatValue;
+      env.GITLAB_PRIVATE_TOKEN = job.gitlabPatValue;
+      env.MAVEN_GITLAB_TOKEN = job.gitlabPatValue;
     }
 
     const credentialsPath = job.gcpCredentialsPath;
@@ -350,6 +356,206 @@ ${block}` : block;
       const message = err instanceof Error ? err.message : String(err);
       this.log(job, `não foi possível atualizar ~/.ssh/config: ${message}`);
     }
+  }
+
+  private async materializeGitlabPersonalAccessToken(job: SandboxJob, repoPath: string): Promise<void> {
+    const tokenFile = job.gitlabPersonalAccessToken;
+    if (!tokenFile?.base64) {
+      return;
+    }
+
+    let buffer: Buffer;
+    try {
+      buffer = Buffer.from(tokenFile.base64, 'base64');
+    } catch {
+      throw new Error('token GitLab enviado é inválido (base64)');
+    }
+
+    const token = this.extractGitlabTokenFromFile(buffer.toString('utf-8'));
+    if (!token) {
+      this.log(job, 'token GitLab enviado está vazio; nenhuma credencial aplicada.');
+      return;
+    }
+
+    const homeDir = this.resolveHomeDir(job);
+    const secretsDir = path.join(homeDir, '.aihub');
+    try {
+      await fs.mkdir(secretsDir, { recursive: true, mode: 0o700 });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`não foi possível preparar diretório para token do GitLab: ${message}`);
+    }
+
+    const destination = path.join(secretsDir, tokenFile.filename?.trim() || 'gitlab-personal-access-token.key');
+    await fs.writeFile(destination, `${token}\n`, { mode: 0o600 });
+    job.gitlabPatPath = destination;
+    job.gitlabPatValue = token;
+    const relative = path.relative(homeDir, destination) || destination;
+    this.log(job, `token GitLab salvo em ${relative}`);
+
+    await this.ensureGitlabMavenSettings(job, token, repoPath);
+  }
+
+  private extractGitlabTokenFromFile(content: string): string | undefined {
+    if (!content) {
+      return undefined;
+    }
+    const lines = content
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    if (lines.length === 0) {
+      return undefined;
+    }
+    for (const line of lines) {
+      const separatorIndex = line.indexOf('=');
+      if (separatorIndex >= 0) {
+        const value = line.slice(separatorIndex + 1).trim();
+        if (value) {
+          return value;
+        }
+      } else if (line) {
+        return line;
+      }
+    }
+    return undefined;
+  }
+
+  private async ensureGitlabMavenSettings(job: SandboxJob, token: string, repoPath: string): Promise<void> {
+    const homeDir = this.resolveHomeDir(job);
+    const m2Dir = path.join(homeDir, '.m2');
+    try {
+      await fs.mkdir(m2Dir, { recursive: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`não foi possível preparar diretório ~/.m2: ${message}`);
+    }
+
+    const settingsPath = path.join(m2Dir, 'settings.xml');
+    let existing = '';
+    try {
+      existing = await fs.readFile(settingsPath, 'utf-8');
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new Error(`não foi possível ler ${settingsPath}: ${message}`);
+      }
+    }
+
+    const repoIds = await this.collectGitlabRepositoryIds(repoPath);
+    if (repoIds.length === 0) {
+      repoIds.push('gitlab-maven');
+    }
+
+    const snippet = this.buildGitlabServersSnippet(repoIds, token);
+    const content = this.mergeMavenSettings(existing, snippet);
+    try {
+      await fs.writeFile(settingsPath, content, { mode: 0o600 });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`não foi possível salvar ${settingsPath}: ${message}`);
+    }
+    const relative = path.relative(homeDir, settingsPath) || settingsPath;
+    this.log(job, `arquivo ~/.m2/settings.xml atualizado (${relative}) para ${repoIds.join(', ')}`);
+  }
+
+  private mergeMavenSettings(existing: string, snippet: string): string {
+    const start = '<!-- ai-hub gitlab token start -->';
+    const end = '<!-- ai-hub gitlab token end -->';
+    const markerRegex = new RegExp(`${start}[\s\S]*?${end}\n?`, 'g');
+    const hasContent = existing && existing.trim().length > 0;
+    if (!hasContent) {
+      return this.wrapMavenSettings(snippet);
+    }
+
+    let sanitized = existing.replace(markerRegex, '');
+    if (/<servers>/i.test(sanitized)) {
+      return sanitized.replace(/<\/servers>/i, `${snippet}\n  </servers>`);
+    }
+    if (/<\/settings>/i.test(sanitized)) {
+      return sanitized.replace(/<\/settings>/i, `  <servers>\n${snippet}\n  </servers>\n</settings>`);
+    }
+    return this.wrapMavenSettings(snippet);
+  }
+
+  private wrapMavenSettings(snippet: string): string {
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">\n  <servers>\n${snippet}\n  </servers>\n</settings>\n`;
+  }
+
+  private buildGitlabServersSnippet(ids: string[], token: string): string {
+    const servers = ids
+      .map(
+        (id) => `    <server>\n      <id>${this.escapeXml(id)}</id>\n      <username>oauth2</username>\n      <password>${this.escapeXml(token)}</password>\n      <configuration>\n        <httpHeaders>\n          <property>\n            <name>Private-Token</name>\n            <value>${this.escapeXml(token)}</value>\n          </property>\n        </httpHeaders>\n      </configuration>\n    </server>`,
+      )
+      .join('\n');
+    return `    <!-- ai-hub gitlab token start -->\n${servers}\n    <!-- ai-hub gitlab token end -->`;
+  }
+
+  private async collectGitlabRepositoryIds(repoPath: string): Promise<string[]> {
+    const pomFiles = await this.findPomFiles(repoPath);
+    const ids = new Set<string>();
+    const urlPattern = /gitlab\.bvsnet\.com\.br\/-\/package-router\/maven/i;
+    const repositoryRegex = /<(repository|pluginRepository)\b[\s\S]*?<\/\1>/gi;
+
+    for (const pom of pomFiles) {
+      let content: string;
+      try {
+        content = await fs.readFile(pom, 'utf-8');
+      } catch {
+        continue;
+      }
+      if (!urlPattern.test(content)) {
+        continue;
+      }
+      repositoryRegex.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = repositoryRegex.exec(content)) !== null) {
+        const block = match[0];
+        if (!urlPattern.test(block)) {
+          continue;
+        }
+        const idMatch = block.match(/<id>([\s\S]*?)<\/id>/i);
+        if (idMatch) {
+          ids.add(idMatch[1].trim());
+        }
+      }
+    }
+
+    return Array.from(ids);
+  }
+
+  private async findPomFiles(dir: string, accumulator: string[] = []): Promise<string[]> {
+    let entries: import('node:fs').Dirent[];
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return accumulator;
+    }
+
+    const skipDirs = new Set(['.git', 'node_modules', 'dist', 'build', 'target', '.idea', '.vscode']);
+
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (skipDirs.has(entry.name)) {
+          continue;
+        }
+        await this.findPomFiles(path.join(dir, entry.name), accumulator);
+        continue;
+      }
+      if (entry.isFile() && entry.name === 'pom.xml') {
+        accumulator.push(path.join(dir, entry.name));
+      }
+    }
+    return accumulator;
+  }
+
+  private escapeXml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
   }
 
   private resolveGithubAuth(job: SandboxJob): { token?: string; username: string; source: string } {

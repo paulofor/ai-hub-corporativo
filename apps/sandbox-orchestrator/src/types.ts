@@ -23,6 +23,11 @@ export interface UploadedGitSshPrivateKey {
   filename?: string;
 }
 
+export interface UploadedGitlabPersonalAccessToken {
+  base64: string;
+  filename?: string;
+}
+
 export interface SandboxJob {
   jobId: string;
   repoSlug?: string;
@@ -36,6 +41,7 @@ export interface SandboxJob {
   uploadedZip?: UploadedZip;
   applicationDefaultCredentials?: UploadedApplicationDefaultCredential;
   gitSshPrivateKey?: UploadedGitSshPrivateKey;
+  gitlabPersonalAccessToken?: UploadedGitlabPersonalAccessToken;
   problemFiles?: UploadedProblemFile[];
   status: JobStatus;
   summary?: string;
@@ -55,7 +61,10 @@ export interface SandboxJob {
   createdAt: string;
   updatedAt: string;
   gitSshKeyPath?: string;
+  gitlabPatPath?: string;
+  gitlabPatValue?: string;
 }
+
 
 export interface JobProcessor {
   process(job: SandboxJob): Promise<void>;

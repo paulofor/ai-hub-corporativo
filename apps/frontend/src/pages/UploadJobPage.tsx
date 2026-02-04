@@ -32,6 +32,7 @@ export default function UploadJobPage() {
   const [problemFiles, setProblemFiles] = useState<File[]>([]);
   const [gcpCredentials, setGcpCredentials] = useState<File | null>(null);
   const [gitPrivateKey, setGitPrivateKey] = useState<File | null>(null);
+  const [gitlabPatFile, setGitlabPatFile] = useState<File | null>(null);
   const [jobs, setJobs] = useState<UploadJob[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -142,6 +143,9 @@ export default function UploadJobPage() {
     if (gitPrivateKey) {
       formData.append('gitSshPrivateKey', gitPrivateKey);
     }
+    if (gitlabPatFile) {
+      formData.append('gitlabPersonalAccessToken', gitlabPatFile);
+    }
 
     try {
       const response = await client.post('/upload-jobs', formData, {
@@ -161,6 +165,7 @@ export default function UploadJobPage() {
       setProblemFiles([]);
       setGcpCredentials(null);
       setGitPrivateKey(null);
+      setGitlabPatFile(null);
       pushToast('Job criado e enviado para o sandbox.');
     } catch (err) {
       setError((err as Error).message);
@@ -299,6 +304,36 @@ export default function UploadJobPage() {
                 <button
                   type="button"
                   onClick={() => setGcpCredentials(null)}
+                  className="text-[11px] font-semibold text-emerald-700 hover:underline"
+                >
+                  Remover
+                </button>
+              </div>
+            )}
+          </div>
+
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Personal Access Token do GitLab (arquivo .key)</label>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Opcional: envie um arquivo texto contendo apenas o token que libera o repositório
+              <code className="ml-1">gitlab.bvsnet.com.br/-/package-router/maven</code>. Ele será salvo como segredo e usado para gerar o
+              <code className="ml-1">~/.m2/settings.xml</code> do sandbox, permitindo que o Maven baixe as dependências privadas.
+            </p>
+            <input
+              type="file"
+              accept=".key,.txt,.cfg,.config,text/plain"
+              onChange={(event) => setGitlabPatFile(event.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-emerald-100 file:px-3 file:py-2 file:text-emerald-700 hover:file:bg-emerald-200 dark:text-slate-200 dark:file:bg-emerald-900/40 dark:file:text-emerald-100"
+            />
+            {gitlabPatFile && (
+              <div className="flex items-center justify-between rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                <span className="truncate pr-3" title={gitlabPatFile.name}>
+                  Selecionado: {gitlabPatFile.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setGitlabPatFile(null)}
                   className="text-[11px] font-semibold text-emerald-700 hover:underline"
                 >
                   Remover

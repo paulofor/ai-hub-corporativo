@@ -26,6 +26,8 @@ public class CreateUploadJobRequest {
 
     private MultipartFile gitSshPrivateKey;
 
+    private MultipartFile gitlabPersonalAccessToken;
+
     public String getTaskDescription() {
         return taskDescription;
     }
@@ -88,5 +90,13 @@ public class CreateUploadJobRequest {
 
     public void setGitSshPrivateKey(MultipartFile gitSshPrivateKey) {
         this.gitSshPrivateKey = gitSshPrivateKey;
+    }
+
+    public MultipartFile getGitlabPersonalAccessToken() {
+        return gitlabPersonalAccessToken;
+    }
+
+    public void setGitlabPersonalAccessToken(MultipartFile gitlabPersonalAccessToken) {
+        this.gitlabPersonalAccessToken = gitlabPersonalAccessToken;
     }
 }

@@ -216,6 +216,58 @@ test('materializa chave SSH personalizada para jobs de upload', async () => {
   await fs.rm(workspace, { recursive: true, force: true });
 });
 
+test('materializa token do GitLab e gera settings do Maven', async () => {
+  const workspace = await fs.mkdtemp(path.join(os.tmpdir(), 'sandbox-gitlab-token-'));
+  const repoPath = path.join(workspace, 'repo');
+  await fs.mkdir(repoPath, { recursive: true });
+  const pom = `<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.example</groupId>
+  <artifactId>demo</artifactId>
+  <version>1.0.0</version>
+  <repositories>
+    <repository>
+      <id>bvsnet-internal</id>
+      <url>https://gitlab.bvsnet.com.br/-/package-router/maven</url>
+    </repository>
+  </repositories>
+</project>`;
+  await fs.writeFile(path.join(repoPath, 'pom.xml'), pom);
+
+  const processor = new SandboxJobProcessor();
+  const token = 'glpat-1234567890';
+  const now = new Date().toISOString();
+  const job: SandboxJob = {
+    jobId: 'job-gitlab-token',
+    repoUrl: 'upload://job-gitlab-token',
+    branch: 'upload',
+    taskDescription: 'noop',
+    status: 'PENDING',
+    logs: [],
+    createdAt: now,
+    updatedAt: now,
+    sandboxPath: workspace,
+    gitlabPersonalAccessToken: { base64: Buffer.from(token).toString('base64'), filename: 'gitlab.key' },
+  } as SandboxJob;
+
+  await (processor as any).materializeGitlabPersonalAccessToken(job, repoPath);
+
+  const settingsPath = path.join(workspace, '.m2', 'settings.xml');
+  const settings = await fs.readFile(settingsPath, 'utf-8');
+  assert.ok(settings.includes('bvsnet-internal'));
+  assert.ok(settings.includes(token));
+
+  const envResult = await (processor as any).handleRunShell(
+    { command: ['sh', '-c', 'echo $GITLAB_PERSONAL_ACCESS_TOKEN'], cwd: '.' },
+    repoPath,
+    job,
+  );
+  assert.equal(envResult.stdout.trim(), token);
+
+  await fs.rm(workspace, { recursive: true, force: true });
+});
+
+
 test('processamento de upload materializa credenciais e chave SSH no workspace', async () => {
   const zip = new AdmZip();
   zip.addFile('README.md', Buffer.from('conteúdo com credenciais'));
