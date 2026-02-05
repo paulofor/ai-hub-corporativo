@@ -109,3 +109,5 @@ infra/downloads/*
 !infra/downloads/.gitkeep
 !infra/downloads/docker-compose.yml
 !infra/downloads/.env.example
+!infra/downloads/envs/
+!infra/downloads/envs/*.env.example
