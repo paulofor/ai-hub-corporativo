@@ -6,7 +6,7 @@ const steps = [
   {
     title: '1) Baixe os arquivos necessários',
     description:
-      'Baixe o pacote compactado com as imagens e o arquivo docker-compose.yml.'
+      'Baixe o pacote compactado com as imagens, o checksum e o arquivo docker-compose.yml.'
   },
   {
     title: '2) Carregue as imagens no Docker',
@@ -15,7 +15,7 @@ const steps = [
   {
     title: '3) Suba os serviços com Docker Compose',
     description:
-      'Execute dentro da pasta onde está o docker-compose.yml (e o .env ajustado).'
+      'Crie uma pasta, copie o docker-compose.yml para ela e ajuste o .env antes de subir.'
   },
   {
     title: '4) Acesse a aplicação',
@@ -88,6 +88,18 @@ export default function DockerImagesPage() {
             <span className="font-semibold"> ai-hub-images.tar</span> está publicado em
             <span className="font-mono">/usr/share/nginx/html/downloads</span> e acessível em
             <span className="font-mono">{downloadUrl}</span>.
+          </span>
+          <span className="block">
+            Depois de baixar o <span className="font-mono">docker-compose.yml</span>, crie uma
+            pasta (ex.: <span className="font-mono">ai-hub-corp</span>), copie o arquivo para lá e
+            adicione o <span className="font-mono">.env</span>. Exemplo:
+            <code className="mx-1 block rounded bg-slate-900/80 px-2 py-1 text-[10px] text-slate-100">
+              mkdir ai-hub-corp &amp;&amp; cd ai-hub-corp
+              <br />
+              cp ~/Downloads/docker-compose.yml .
+              <br />
+              cp ~/Downloads/.env .
+            </code>
           </span>
           <span className="block">
             Se o <code className="mx-1 rounded bg-slate-900/80 px-1 py-0.5 text-[10px] text-slate-100">
