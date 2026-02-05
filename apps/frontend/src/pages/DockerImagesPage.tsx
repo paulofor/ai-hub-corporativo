@@ -1,4 +1,5 @@
 const downloadUrl = '/downloads/ai-hub-images.tar';
+const checksumUrl = `${downloadUrl}.sha256`;
 
 const steps = [
   {
@@ -38,22 +39,42 @@ export default function DockerImagesPage() {
               Pacote completo (.tar)
             </h3>
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              Inclui backend, frontend e sandbox-orchestrator.
+              Inclui backend, frontend e sandbox-orchestrator. O arquivo é regenerado a cada deploy
+              para garantir que corresponda às imagens publicadas no GHCR.
             </p>
           </div>
-          <a
-            href={downloadUrl}
-            download
-            className="inline-flex items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
-          >
-            Baixar imagens
-          </a>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <a
+              href={downloadUrl}
+              download
+              className="inline-flex items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+            >
+              Baixar imagens
+            </a>
+            <a
+              href={checksumUrl}
+              download
+              className="inline-flex items-center justify-center rounded-md border border-emerald-200 px-4 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+            >
+              SHA-256
+            </a>
+          </div>
         </div>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Caso o download não inicie, verifique se o arquivo
-          <span className="font-semibold"> ai-hub-images.tar</span> está publicado em
-          <span className="font-mono">/usr/share/nginx/html/downloads</span> e acessível em
-          <span className="font-mono">{downloadUrl}</span>.
+        <p className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
+          <span className="block">
+            Caso o download não inicie, verifique se o arquivo
+            <span className="font-semibold"> ai-hub-images.tar</span> está publicado em
+            <span className="font-mono">/usr/share/nginx/html/downloads</span> e acessível em
+            <span className="font-mono">{downloadUrl}</span>.
+          </span>
+          <span className="block">
+            Para validar a integridade, baixe também o checksum em
+            <span className="font-mono"> {checksumUrl}</span> e execute
+            <code className="mx-1 rounded bg-slate-900/80 px-1 py-0.5 text-[10px] text-slate-100">
+              sha256sum -c ai-hub-images.tar.sha256
+            </code>
+            antes de carregar as imagens.
+          </span>
         </p>
       </div>
 

@@ -73,3 +73,23 @@ Isso vai baixar as imagens, criar a network externa `public-net` (se ainda não 
 - No próximo push para `main`, o GitHub Actions fará o `rsync` para `/root/ai-hub-corporativo` nesse novo servidor e rodará `docker compose pull && docker compose up -d` automaticamente.
 
 Pronto! Após concluir os passos acima, a nova VPS estará preparada para receber deploys e servir o ambiente em produção.
+
+## 8) Gerar o pacote offline das imagens Docker
+
+O botão "Baixar imagens" da UI lê os arquivos disponibilizados em `infra/downloads` (montado no contêiner do frontend em `/usr/share/nginx/html/downloads`).
+O workflow de deploy já executa automaticamente o script `./infra/bin/package-docker-images.sh` após cada release para atualizar
+o arquivo `ai-hub-images.tar` e o respectivo checksum `.sha256`.
+
+Caso precise regerar o pacote manualmente na VPS, rode:
+
+```bash
+cd /root/ai-hub-corporativo
+export BACKEND_IMAGE=ghcr.io/<USUARIO>/ai-hub-corporativo-backend:latest
+export FRONTEND_IMAGE=ghcr.io/<USUARIO>/ai-hub-corporativo-frontend:latest
+export SANDBOX_ORCHESTRATOR_IMAGE=ghcr.io/<USUARIO>/ai-hub-corporativo-sandbox:latest
+./infra/bin/package-docker-images.sh
+```
+
+O comando cria/atualiza `infra/downloads/ai-hub-images.tar` e `infra/downloads/ai-hub-images.tar.sha256`, imediatamente disponíveis em
+`https://iahubcorp.online/downloads/`.
+
