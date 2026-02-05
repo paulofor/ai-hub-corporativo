@@ -1,12 +1,13 @@
 const downloadUrl = '/downloads/ai-hub-images.tar';
 const checksumUrl = `${downloadUrl}.sha256`;
 const composeUrl = '/downloads/docker-compose.yml';
+const envExampleUrl = '/downloads/.env.example';
 
 const steps = [
   {
     title: '1) Baixe os arquivos necessários',
     description:
-      'Baixe o pacote compactado com as imagens, o checksum e o arquivo docker-compose.yml.'
+      'Baixe o pacote compactado com as imagens, o checksum, o docker-compose.yml e o .env.example.'
   },
   {
     title: '2) Carregue as imagens no Docker',
@@ -15,7 +16,7 @@ const steps = [
   {
     title: '3) Suba os serviços com Docker Compose',
     description:
-      'Crie uma pasta, copie o docker-compose.yml para ela e ajuste o .env antes de subir.'
+      'Crie uma pasta, copie o docker-compose.yml para ela e gere o .env a partir do exemplo.'
   },
   {
     title: '4) Acesse a aplicação',
@@ -80,6 +81,13 @@ export default function DockerImagesPage() {
             >
               Baixar docker-compose.yml
             </a>
+            <a
+              href={envExampleUrl}
+              download
+              className="inline-flex items-center justify-center rounded-md border border-emerald-200 px-4 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+            >
+              .env.example
+            </a>
           </div>
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
@@ -90,15 +98,18 @@ export default function DockerImagesPage() {
             <span className="font-mono">{downloadUrl}</span>.
           </span>
           <span className="block">
-            Depois de baixar o <span className="font-mono">docker-compose.yml</span>, crie uma
-            pasta (ex.: <span className="font-mono">ai-hub-corp</span>), copie o arquivo para lá e
-            adicione o <span className="font-mono">.env</span>. Exemplo:
+            Depois de baixar o <span className="font-mono">docker-compose.yml</span> e o
+            <span className="font-mono"> .env.example</span>, crie uma pasta (ex.:
+            <span className="font-mono"> ai-hub-corp</span>), copie os arquivos e gere o
+            <span className="font-mono"> .env</span>. Exemplo:
             <code className="mx-1 block rounded bg-slate-900/80 px-2 py-1 text-[10px] text-slate-100">
               mkdir ai-hub-corp &amp;&amp; cd ai-hub-corp
               <br />
               cp ~/Downloads/docker-compose.yml .
               <br />
-              cp ~/Downloads/.env .
+              cp ~/Downloads/.env.example .
+              <br />
+              cp .env.example .env
             </code>
           </span>
           <span className="block">
