@@ -11,6 +11,7 @@ import CodexModelsPage from './pages/CodexModelsPage';
 import EnvironmentsPage from './pages/EnvironmentsPage';
 import UploadJobPage from './pages/UploadJobPage';
 import UploadJobDetailPage from './pages/UploadJobDetailPage';
+import DockerImagesPage from './pages/DockerImagesPage';
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
         <Route path="/codex/models" element={<CodexModelsPage />} />
         <Route path="/upload-jobs" element={<UploadJobPage />} />
         <Route path="/upload-jobs/:jobId" element={<UploadJobDetailPage />} />
+        <Route path="/docker-images" element={<DockerImagesPage />} />
         <Route path="/audit" element={<AuditLogPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
