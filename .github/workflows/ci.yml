@@ -152,10 +152,15 @@ jobs:
       - name: Ensure environment file exists on VPS
         run: |
           ssh ${SSH_COMMON_ARGS} "${DEPLOY_USER}@${DEPLOY_HOST}" "cd ${REMOTE_PATH} && if [ ! -f .env ]; then cp .env.example .env; fi"
+      - name: Define container image references
+        run: |
+          echo "REMOTE_IMAGES_ENV=BACKEND_IMAGE=ghcr.io/${GHCR_USERNAME}/ai-hub-corporativo-backend:latest FRONTEND_IMAGE=ghcr.io/${GHCR_USERNAME}/ai-hub-corporativo-frontend:latest SANDBOX_ORCHESTRATOR_IMAGE=ghcr.io/${GHCR_USERNAME}/ai-hub-corporativo-sandbox:latest" >> "$GITHUB_ENV"
       - name: Publish services
         run: |
-          REMOTE_IMAGES_ENV="BACKEND_IMAGE=ghcr.io/${GHCR_USERNAME}/ai-hub-corporativo-backend:latest FRONTEND_IMAGE=ghcr.io/${GHCR_USERNAME}/ai-hub-corporativo-frontend:latest SANDBOX_ORCHESTRATOR_IMAGE=ghcr.io/${GHCR_USERNAME}/ai-hub-corporativo-sandbox:latest"
-          ssh ${SSH_COMMON_ARGS} "${DEPLOY_USER}@${DEPLOY_HOST}" "set -euo pipefail && cd ${REMOTE_PATH} && export ${REMOTE_IMAGES_ENV} && docker compose pull && docker compose up -d"
+          ssh ${SSH_COMMON_ARGS} "${DEPLOY_USER}@${DEPLOY_HOST}" "set -euo pipefail && cd ${REMOTE_PATH} && mkdir -p infra/downloads && export ${REMOTE_IMAGES_ENV} && docker compose pull && docker compose up -d"
+      - name: Generate offline Docker bundle
+        run: |
+          ssh ${SSH_COMMON_ARGS} "${DEPLOY_USER}@${DEPLOY_HOST}" "set -euo pipefail && cd ${REMOTE_PATH} && export ${REMOTE_IMAGES_ENV} && ./infra/bin/package-docker-images.sh"
       - name: Clean up GHCR images for this build
         env:
           GHCR_OWNER: ${{ github.repository_owner }}

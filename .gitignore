@@ -104,3 +104,6 @@ infra/nginx/letsencrypt/*
 !infra/nginx/letsencrypt/.gitkeep
 infra/nginx/certbot-www/*
 !infra/nginx/certbot-www/.gitkeep
+# Download bundles
+infra/downloads/*
+!infra/downloads/.gitkeep
