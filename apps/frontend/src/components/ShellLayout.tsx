@@ -10,6 +10,7 @@ const links = [
   { to: '/codex', label: 'Codex' },
   { to: '/codex/models', label: 'Modelos Codex' },
   { to: '/upload-jobs', label: 'Upload ZIP' },
+  { to: '/docker-images', label: 'Imagens Docker' },
   { to: '/audit', label: 'Audit Log' }
 ];
 
