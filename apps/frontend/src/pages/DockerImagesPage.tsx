@@ -2,9 +2,9 @@ const downloadUrl = '/downloads/ai-hub-images.tar';
 
 const steps = [
   {
-    title: '1) Baixe o arquivo .tar com as imagens',
+    title: '1) Baixe o arquivo compactado com as imagens',
     description:
-      'Use o botão abaixo para baixar o pacote com as imagens do backend, frontend e sandbox.'
+      'Use o botão abaixo para baixar o pacote compactado com as imagens do backend, frontend e sandbox.'
   },
   {
     title: '2) Carregue as imagens no Docker',
@@ -43,6 +43,7 @@ export default function DockerImagesPage() {
           </div>
           <a
             href={downloadUrl}
+            download
             className="inline-flex items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
           >
             Baixar imagens
@@ -50,8 +51,9 @@ export default function DockerImagesPage() {
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400">
           Caso o download não inicie, verifique se o arquivo
-          <span className="font-semibold"> ai-hub-images.tar</span> está publicado no
-          servidor em <span className="font-mono">{downloadUrl}</span>.
+          <span className="font-semibold"> ai-hub-images.tar</span> está publicado em
+          <span className="font-mono">/usr/share/nginx/html/downloads</span> e acessível em
+          <span className="font-mono">{downloadUrl}</span>.
         </p>
       </div>
 
