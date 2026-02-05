@@ -1,25 +1,32 @@
 const downloadUrl = '/downloads/ai-hub-images.tar';
 const checksumUrl = `${downloadUrl}.sha256`;
 const composeUrl = '/downloads/docker-compose.yml';
-const envExampleUrl = '/downloads/.env.example';
+const envRootUrl = '/downloads/envs/root.env.example';
+const envBackendUrl = '/downloads/envs/backend.env.example';
+const envFrontendUrl = '/downloads/envs/frontend.env.example';
+const envSandboxUrl = '/downloads/envs/sandbox-orchestrator.env.example';
 
 const steps = [
   {
     title: '1) Baixe os arquivos necessários',
     description:
-      'Baixe o pacote compactado com as imagens, o checksum, o docker-compose.yml e o .env.example.'
+      'Baixe o pacote de imagens, o checksum, o docker-compose.yml e os .env.example de cada serviço.'
   },
   {
-    title: '2) Carregue as imagens no Docker',
+    title: '2) Monte a estrutura de pastas',
+    description:
+      'Crie uma pasta dedicada e replique as pastas apps/backend, apps/frontend e apps/sandbox-orchestrator.'
+  },
+  {
+    title: '3) Carregue as imagens no Docker',
     description: 'No terminal da sua máquina, rode o comando:'
   },
   {
-    title: '3) Suba os serviços com Docker Compose',
-    description:
-      'Crie uma pasta, copie o docker-compose.yml para ela e gere o .env a partir do exemplo.'
+    title: '4) Suba os serviços com Docker Compose',
+    description: 'No mesmo diretório do docker-compose.yml, rode o comando:'
   },
   {
-    title: '4) Acesse a aplicação',
+    title: '5) Acesse a aplicação',
     description: 'Frontend em http://localhost:8082 e API em http://localhost:8081.'
   }
 ];
@@ -69,8 +76,8 @@ export default function DockerImagesPage() {
               docker-compose.yml
             </h3>
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              O Docker Compose precisa desse arquivo para subir os serviços. Baixe e execute o
-              comando no mesmo diretório.
+              O Docker Compose precisa desse arquivo para subir os serviços. Baixe e mantenha-o na
+              raiz da pasta onde você vai executar o ambiente offline.
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
@@ -81,13 +88,72 @@ export default function DockerImagesPage() {
             >
               Baixar docker-compose.yml
             </a>
-            <a
-              href={envExampleUrl}
-              download
-              className="inline-flex items-center justify-center rounded-md border border-emerald-200 px-4 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
-            >
-              .env.example
-            </a>
+          </div>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+              Arquivos .env.example por serviço
+            </h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              O <span className="font-mono">docker-compose.yml</span> referencia os arquivos dentro
+              da estrutura <span className="font-mono">apps/&lt;serviço&gt;/.env.example</span>.
+              Baixe cada arquivo e coloque exatamente nesse caminho.
+            </p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {[
+              {
+                title: 'Raiz do projeto (.env.example)',
+                description: 'Configurações globais e tokens usados por todos os serviços.',
+                href: envRootUrl,
+                fileName: '.env.example',
+                targetPath: '.env.example'
+              },
+              {
+                title: 'Backend',
+                description: 'Variáveis do API e conexão com banco de dados.',
+                href: envBackendUrl,
+                fileName: 'backend.env.example',
+                targetPath: 'apps/backend/.env.example'
+              },
+              {
+                title: 'Frontend',
+                description: 'URLs e configurações consumidas pelo app web.',
+                href: envFrontendUrl,
+                fileName: 'frontend.env.example',
+                targetPath: 'apps/frontend/.env.example'
+              },
+              {
+                title: 'Sandbox Orchestrator',
+                description: 'Credenciais e endpoints do orquestrador.',
+                href: envSandboxUrl,
+                fileName: 'sandbox-orchestrator.env.example',
+                targetPath: 'apps/sandbox-orchestrator/.env.example'
+              }
+            ].map((envFile) => (
+              <div
+                key={envFile.title}
+                className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 p-4"
+              >
+                <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  {envFile.title}
+                </h4>
+                <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                  {envFile.description}
+                </p>
+                <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                  Salve como <span className="font-mono">{envFile.targetPath}</span>
+                </p>
+                <a
+                  href={envFile.href}
+                  download={envFile.fileName}
+                  className="mt-3 inline-flex items-center justify-center rounded-md border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                >
+                  Baixar {envFile.fileName}
+                </a>
+              </div>
+            ))}
           </div>
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
@@ -98,16 +164,23 @@ export default function DockerImagesPage() {
             <span className="font-mono">{downloadUrl}</span>.
           </span>
           <span className="block">
-            Depois de baixar o <span className="font-mono">docker-compose.yml</span> e o
-            <span className="font-mono"> .env.example</span>, crie uma pasta (ex.:
-            <span className="font-mono"> ai-hub-corp</span>), copie os arquivos e gere o
-            <span className="font-mono"> .env</span>. Exemplo:
+            Depois de baixar o <span className="font-mono">docker-compose.yml</span> e os
+            <span className="font-mono"> .env.example</span>, crie a estrutura de pastas e renomeie
+            o arquivo de raiz para <span className="font-mono">.env</span>. Exemplo:
             <code className="mx-1 block rounded bg-slate-900/80 px-2 py-1 text-[10px] text-slate-100">
               mkdir ai-hub-corp &amp;&amp; cd ai-hub-corp
               <br />
               cp ~/Downloads/docker-compose.yml .
               <br />
-              cp ~/Downloads/.env.example .
+              mkdir -p apps/backend apps/frontend apps/sandbox-orchestrator
+              <br />
+              cp ~/Downloads/backend.env.example apps/backend/.env.example
+              <br />
+              cp ~/Downloads/frontend.env.example apps/frontend/.env.example
+              <br />
+              cp ~/Downloads/sandbox-orchestrator.env.example apps/sandbox-orchestrator/.env.example
+              <br />
+              cp ~/Downloads/root.env.example .env.example
               <br />
               cp .env.example .env
             </code>
@@ -116,8 +189,11 @@ export default function DockerImagesPage() {
             Se o <code className="mx-1 rounded bg-slate-900/80 px-1 py-0.5 text-[10px] text-slate-100">
               docker compose up -d
             </code>
-            retornar <span className="font-semibold">no configuration file provided</span>,
-            significa que o comando foi executado fora da pasta com o
+            retornar <span className="font-semibold">env file ... not found</span>, confirme se os
+            arquivos estão exatamente em
+            <span className="font-mono"> apps/&lt;serviço&gt;/.env.example</span>. Se retornar
+            <span className="font-semibold">no configuration file provided</span>, significa que o
+            comando foi executado fora da pasta com o
             <span className="font-mono"> docker-compose.yml</span>.
           </span>
           <span className="block">
@@ -143,10 +219,15 @@ export default function DockerImagesPage() {
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{step.description}</p>
             {step.title.startsWith('2') && (
               <pre className="mt-3 rounded-lg bg-slate-900/90 text-slate-100 p-3 text-xs overflow-x-auto">
-                docker load -i ai-hub-images.tar
+                mkdir -p ai-hub-corp/apps/backend ai-hub-corp/apps/frontend ai-hub-corp/apps/sandbox-orchestrator
               </pre>
             )}
             {step.title.startsWith('3') && (
+              <pre className="mt-3 rounded-lg bg-slate-900/90 text-slate-100 p-3 text-xs overflow-x-auto">
+                docker load -i ai-hub-images.tar
+              </pre>
+            )}
+            {step.title.startsWith('4') && (
               <pre className="mt-3 rounded-lg bg-slate-900/90 text-slate-100 p-3 text-xs overflow-x-auto">
                 docker compose up -d
               </pre>
