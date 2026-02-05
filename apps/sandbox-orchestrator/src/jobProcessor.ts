@@ -260,6 +260,7 @@ export class SandboxJobProcessor implements JobProcessor {
   private async materializeApplicationDefaultCredentials(job: SandboxJob): Promise<void> {
     const credentials = job.applicationDefaultCredentials;
     if (!credentials?.base64) {
+      this.log(job, 'nenhum arquivo de credenciais do GCP recebido');
       return;
     }
 
@@ -278,7 +279,10 @@ export class SandboxJobProcessor implements JobProcessor {
       const destination = path.join(targetDir, filename);
       await fs.writeFile(destination, buffer, { mode: 0o600 });
       job.gcpCredentialsPath = destination;
-      this.log(job, `arquivo de credenciais GCP salvo em ${destination}`);
+      this.log(
+        job,
+        `arquivo de credenciais GCP recebido (${credentials.filename ?? 'sem nome'}) e salvo em ${destination}`,
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       throw new Error(`não foi possível salvar credenciais do GCP: ${message}`);
@@ -292,6 +296,7 @@ export class SandboxJobProcessor implements JobProcessor {
   private async materializeGitSshPrivateKey(job: SandboxJob): Promise<void> {
     const key = job.gitSshPrivateKey;
     if (!key?.base64) {
+      this.log(job, 'nenhuma chave SSH enviada');
       return;
     }
 
@@ -328,7 +333,10 @@ export class SandboxJobProcessor implements JobProcessor {
     await this.ensureSshConfig(job, sshDir, destination);
     job.gitSshKeyPath = destination;
     const relative = path.relative(homeDir, destination) || destination;
-    this.log(job, `chave SSH personalizada salva em ${relative}`);
+    this.log(
+      job,
+      `chave SSH recebida (${key.filename ?? 'sem nome'}) salva em ${relative}`,
+    );
   }
 
   private async ensureSshConfig(job: SandboxJob, sshDir: string, keyPath: string): Promise<void> {
@@ -361,6 +369,7 @@ ${block}` : block;
   private async materializeGitlabPersonalAccessToken(job: SandboxJob, repoPath: string): Promise<void> {
     const tokenFile = job.gitlabPersonalAccessToken;
     if (!tokenFile?.base64) {
+      this.log(job, 'nenhum token GitLab enviado');
       return;
     }
 
@@ -391,7 +400,7 @@ ${block}` : block;
     job.gitlabPatPath = destination;
     job.gitlabPatValue = token;
     const relative = path.relative(homeDir, destination) || destination;
-    this.log(job, `token GitLab salvo em ${relative}`);
+    this.log(job, `token GitLab recebido (${tokenFile.filename ?? 'sem nome'}) salvo em ${relative}`);
 
     await this.ensureGitlabMavenSettings(job, token, repoPath);
   }
@@ -457,6 +466,8 @@ ${block}` : block;
     }
     const relative = path.relative(homeDir, settingsPath) || settingsPath;
     this.log(job, `arquivo ~/.m2/settings.xml atualizado (${relative}) para ${repoIds.join(', ')}`);
+    const safeContent = this.redactSecrets(content, token);
+    this.log(job, `conteúdo atual de ${relative} (redigido):\n${safeContent}`);
   }
 
   private mergeMavenSettings(existing: string, snippet: string): string {
@@ -489,6 +500,15 @@ ${block}` : block;
       )
       .join('\n');
     return `    <!-- ai-hub gitlab token start -->\n${servers}\n    <!-- ai-hub gitlab token end -->`;
+  }
+
+  private redactSecrets(content: string, secret: string): string {
+    if (!content) {
+      return content;
+    }
+    const escapedSecret = secret.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const secretRegex = new RegExp(escapedSecret, 'g');
+    return content.replace(secretRegex, '****');
   }
 
   private async collectGitlabRepositoryIds(repoPath: string): Promise<string[]> {
