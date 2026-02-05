@@ -1,11 +1,13 @@
 const downloadUrl = '/downloads/ai-hub-images.tar';
 const checksumUrl = `${downloadUrl}.sha256`;
+const composeUrl = '/downloads/docker-compose.yml';
+const envExampleUrl = '/downloads/.env.example';
 
 const steps = [
   {
-    title: '1) Baixe o arquivo compactado com as imagens',
+    title: '1) Baixe os arquivos necessários',
     description:
-      'Use o botão abaixo para baixar o pacote compactado com as imagens do backend, frontend e sandbox.'
+      'Baixe o pacote compactado com as imagens, o checksum, o docker-compose.yml e o .env.example.'
   },
   {
     title: '2) Carregue as imagens no Docker',
@@ -13,7 +15,8 @@ const steps = [
   },
   {
     title: '3) Suba os serviços com Docker Compose',
-    description: 'Com o .env ajustado, rode:'
+    description:
+      'Crie uma pasta, copie o docker-compose.yml para ela e gere o .env a partir do exemplo.'
   },
   {
     title: '4) Acesse a aplicação',
@@ -60,12 +63,62 @@ export default function DockerImagesPage() {
             </a>
           </div>
         </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+              docker-compose.yml
+            </h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              O Docker Compose precisa desse arquivo para subir os serviços. Baixe e execute o
+              comando no mesmo diretório.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <a
+              href={composeUrl}
+              download
+              className="inline-flex items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+            >
+              Baixar docker-compose.yml
+            </a>
+            <a
+              href={envExampleUrl}
+              download
+              className="inline-flex items-center justify-center rounded-md border border-emerald-200 px-4 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+            >
+              .env.example
+            </a>
+          </div>
+        </div>
         <p className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
           <span className="block">
             Caso o download não inicie, verifique se o arquivo
             <span className="font-semibold"> ai-hub-images.tar</span> está publicado em
             <span className="font-mono">/usr/share/nginx/html/downloads</span> e acessível em
             <span className="font-mono">{downloadUrl}</span>.
+          </span>
+          <span className="block">
+            Depois de baixar o <span className="font-mono">docker-compose.yml</span> e o
+            <span className="font-mono"> .env.example</span>, crie uma pasta (ex.:
+            <span className="font-mono"> ai-hub-corp</span>), copie os arquivos e gere o
+            <span className="font-mono"> .env</span>. Exemplo:
+            <code className="mx-1 block rounded bg-slate-900/80 px-2 py-1 text-[10px] text-slate-100">
+              mkdir ai-hub-corp &amp;&amp; cd ai-hub-corp
+              <br />
+              cp ~/Downloads/docker-compose.yml .
+              <br />
+              cp ~/Downloads/.env.example .
+              <br />
+              cp .env.example .env
+            </code>
+          </span>
+          <span className="block">
+            Se o <code className="mx-1 rounded bg-slate-900/80 px-1 py-0.5 text-[10px] text-slate-100">
+              docker compose up -d
+            </code>
+            retornar <span className="font-semibold">no configuration file provided</span>,
+            significa que o comando foi executado fora da pasta com o
+            <span className="font-mono"> docker-compose.yml</span>.
           </span>
           <span className="block">
             Para validar a integridade, baixe também o checksum em
