@@ -107,3 +107,4 @@ infra/nginx/certbot-www/*
 # Download bundles
 infra/downloads/*
 !infra/downloads/.gitkeep
+!infra/downloads/docker-compose.yml
