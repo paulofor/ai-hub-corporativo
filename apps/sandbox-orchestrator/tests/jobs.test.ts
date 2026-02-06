@@ -1642,7 +1642,7 @@ test('mantém workspace quando SANDBOX_KEEP_WORKSPACE=true', async () => {
   }
 });
 
-test('mantém workspace quando SANDBOX_KEEP_WORKSPACE não está habilitado', async () => {
+test('remove workspace quando SANDBOX_KEEP_WORKSPACE não está habilitado', async () => {
   const originalKeepWorkspace = process.env.SANDBOX_KEEP_WORKSPACE;
   delete process.env.SANDBOX_KEEP_WORKSPACE;
 
@@ -1651,10 +1651,9 @@ test('mantém workspace quando SANDBOX_KEEP_WORKSPACE não está habilitado', as
 
   await (processor as any).cleanup(workspace);
 
-  const stat = await fs.stat(workspace);
-  assert.ok(stat.isDirectory());
+  const existsAfterCleanup = await fs.access(workspace).then(() => true).catch(() => false);
+  assert.equal(existsAfterCleanup, false);
 
-  await fs.rm(workspace, { recursive: true, force: true });
 
   if (originalKeepWorkspace === undefined) {
     delete process.env.SANDBOX_KEEP_WORKSPACE;
