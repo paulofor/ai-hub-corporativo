@@ -411,6 +411,14 @@ ${block}` : block;
     if (!content) {
       return undefined;
     }
+
+    const normalized = content.trim();
+    if (/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/i.test(normalized)) {
+      throw new Error(
+        'token GitLab enviado parece ser uma chave privada SSH; envie um arquivo contendo apenas o PAT (glpat-...).',
+      );
+    }
+
     const lines = content
       .split(/\r?\n/)
       .map((line) => line.trim())
@@ -594,14 +602,9 @@ ${block}` : block;
   }
 
   private async cleanup(workspace: string): Promise<void> {
-    if (this.keepWorkspace) {
-      return;
-    }
-    try {
-      await fs.rm(workspace, { recursive: true, force: true });
-    } catch (err) {
-      // noop
-    }
+    // Mantemos o workspace ao final do processamento para preservar artefatos
+    // gerados durante o job (ex.: ~/.m2/settings.xml) para inspeção posterior.
+    return;
   }
 
   private parseBoolean(rawValue: string | undefined, fallback: boolean): boolean {

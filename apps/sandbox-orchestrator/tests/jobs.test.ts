@@ -267,6 +267,38 @@ test('materializa token do GitLab e gera settings do Maven', async () => {
   await fs.rm(workspace, { recursive: true, force: true });
 });
 
+test('falha com mensagem clara quando arquivo enviado no campo de PAT é uma chave SSH', async () => {
+  const workspace = await fs.mkdtemp(path.join(os.tmpdir(), 'sandbox-gitlab-token-invalid-'));
+  const repoPath = path.join(workspace, 'repo');
+  await fs.mkdir(repoPath, { recursive: true });
+  await fs.writeFile(path.join(repoPath, 'pom.xml'), '<project/>');
+
+  const processor = new SandboxJobProcessor();
+  const now = new Date().toISOString();
+  const sshPrivateKey = `-----BEGIN OPENSSH PRIVATE KEY-----\nabc123\n-----END OPENSSH PRIVATE KEY-----`;
+  const job: SandboxJob = {
+    jobId: 'job-gitlab-token-invalid',
+    repoUrl: 'upload://job-gitlab-token-invalid',
+    branch: 'upload',
+    taskDescription: 'noop',
+    status: 'PENDING',
+    logs: [],
+    createdAt: now,
+    updatedAt: now,
+    sandboxPath: workspace,
+    gitlabPersonalAccessToken: { base64: Buffer.from(sshPrivateKey).toString('base64'), filename: 'id_ed25519.key' },
+  } as SandboxJob;
+
+  await assert.rejects(
+    async () => {
+      await (processor as any).materializeGitlabPersonalAccessToken(job, repoPath);
+    },
+    /parece ser uma chave privada SSH/,
+  );
+
+  await fs.rm(workspace, { recursive: true, force: true });
+});
+
 
 test('processamento de upload materializa credenciais e chave SSH no workspace', async () => {
   const zip = new AdmZip();
@@ -1610,7 +1642,7 @@ test('mantém workspace quando SANDBOX_KEEP_WORKSPACE=true', async () => {
   }
 });
 
-test('remove workspace quando SANDBOX_KEEP_WORKSPACE não está habilitado', async () => {
+test('mantém workspace quando SANDBOX_KEEP_WORKSPACE não está habilitado', async () => {
   const originalKeepWorkspace = process.env.SANDBOX_KEEP_WORKSPACE;
   delete process.env.SANDBOX_KEEP_WORKSPACE;
 
@@ -1619,7 +1651,10 @@ test('remove workspace quando SANDBOX_KEEP_WORKSPACE não está habilitado', asy
 
   await (processor as any).cleanup(workspace);
 
-  await assert.rejects(fs.stat(workspace));
+  const stat = await fs.stat(workspace);
+  assert.ok(stat.isDirectory());
+
+  await fs.rm(workspace, { recursive: true, force: true });
 
   if (originalKeepWorkspace === undefined) {
     delete process.env.SANDBOX_KEEP_WORKSPACE;
