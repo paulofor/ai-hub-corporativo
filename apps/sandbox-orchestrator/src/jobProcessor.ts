@@ -176,7 +176,12 @@ export class SandboxJobProcessor implements JobProcessor {
       this.log(job, `falha ao processar job: ${job.error}`);
     } finally {
       job.updatedAt = new Date().toISOString();
-      this.log(job, `limpando workspace ${workspace}`);
+      this.log(
+        job,
+        this.keepWorkspace
+          ? `SANDBOX_KEEP_WORKSPACE=true; preservando workspace ${workspace} para depuração`
+          : `limpando workspace ${workspace}`,
+      );
       await this.cleanup(workspace);
     }
   }
@@ -602,9 +607,10 @@ ${block}` : block;
   }
 
   private async cleanup(workspace: string): Promise<void> {
-    // Mantemos o workspace ao final do processamento para preservar artefatos
-    // gerados durante o job (ex.: ~/.m2/settings.xml) para inspeção posterior.
-    return;
+    if (this.keepWorkspace) {
+      return;
+    }
+    await fs.rm(workspace, { recursive: true, force: true });
   }
 
   private parseBoolean(rawValue: string | undefined, fallback: boolean): boolean {
