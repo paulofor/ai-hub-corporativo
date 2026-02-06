@@ -14,9 +14,9 @@ const steps = [
       'Baixe o pacote de imagens, o checksum, o docker-compose.yml, o frontend.conf do Nginx e os .env.example de cada serviço.'
   },
   {
-    title: '2) Monte a estrutura de pastas',
+    title: '2) Configure a OPENAI_API_KEY no arquivo .env',
     description:
-      'Crie uma pasta dedicada e replique as pastas apps/backend, apps/frontend, apps/sandbox-orchestrator e infra/nginx.'
+      'Defina a OPENAI_API_KEY no arquivo .env na raiz do projeto (mesma pasta do docker-compose.yml).'
   },
   {
     title: '3) Carregue as imagens no Docker',
@@ -204,9 +204,11 @@ export default function DockerImagesPage() {
               <br />
               cp ~/Downloads/sandbox-orchestrator.env.example apps/sandbox-orchestrator/.env.example
               <br />
-              cp ~/Downloads/root.env.example .env.example
+              cp ~/Downloads/env.example .env.example
               <br />
               cp ~/Downloads/frontend.conf infra/nginx/frontend.conf
+              <br />
+              cp ~/Downloads/ai-hub-images.tar .
               <br />
               cp .env.example .env
             </code>
@@ -245,7 +247,9 @@ export default function DockerImagesPage() {
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{step.description}</p>
             {step.title.startsWith('2') && (
               <pre className="mt-3 rounded-lg bg-slate-900/90 text-slate-100 p-3 text-xs overflow-x-auto">
-                mkdir -p ai-hub-corp/apps/backend ai-hub-corp/apps/frontend ai-hub-corp/apps/sandbox-orchestrator ai-hub-corp/infra/nginx
+                ai-hub-corp/.env
+                <br />
+                OPENAI_API_KEY=seu_token_aqui
               </pre>
             )}
             {step.title.startsWith('3') && (
