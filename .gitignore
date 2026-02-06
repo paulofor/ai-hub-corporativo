@@ -111,3 +111,5 @@ infra/downloads/*
 !infra/downloads/.env.example
 !infra/downloads/envs/
 !infra/downloads/envs/*.env.example
+!infra/downloads/nginx/
+!infra/downloads/nginx/*.conf

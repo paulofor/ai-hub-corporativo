@@ -1,6 +1,7 @@
 const downloadUrl = '/downloads/ai-hub-images.tar';
 const checksumUrl = `${downloadUrl}.sha256`;
 const composeUrl = '/downloads/docker-compose.yml';
+const nginxFrontendConfUrl = '/downloads/nginx/frontend.conf';
 const envRootUrl = '/downloads/envs/root.env.example';
 const envBackendUrl = '/downloads/envs/backend.env.example';
 const envFrontendUrl = '/downloads/envs/frontend.env.example';
@@ -10,12 +11,12 @@ const steps = [
   {
     title: '1) Baixe os arquivos necessários',
     description:
-      'Baixe o pacote de imagens, o checksum, o docker-compose.yml e os .env.example de cada serviço.'
+      'Baixe o pacote de imagens, o checksum, o docker-compose.yml, o frontend.conf do Nginx e os .env.example de cada serviço.'
   },
   {
     title: '2) Monte a estrutura de pastas',
     description:
-      'Crie uma pasta dedicada e replique as pastas apps/backend, apps/frontend e apps/sandbox-orchestrator.'
+      'Crie uma pasta dedicada e replique as pastas apps/backend, apps/frontend, apps/sandbox-orchestrator e infra/nginx.'
   },
   {
     title: '3) Carregue as imagens no Docker',
@@ -87,6 +88,28 @@ export default function DockerImagesPage() {
               className="inline-flex items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
             >
               Baixar docker-compose.yml
+            </a>
+          </div>
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+              Configuração do Nginx (frontend.conf)
+            </h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Necessário para o reverse-proxy subir corretamente. Salve o arquivo em
+              <span className="font-mono"> infra/nginx/frontend.conf</span>. Se você não baixar, o
+              Docker Compose cria um template automático no primeiro
+              <span className="font-mono"> up</span>.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <a
+              href={nginxFrontendConfUrl}
+              download
+              className="inline-flex items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+            >
+              Baixar frontend.conf
             </a>
           </div>
         </div>
@@ -165,14 +188,15 @@ export default function DockerImagesPage() {
           </span>
           <span className="block">
             Depois de baixar o <span className="font-mono">docker-compose.yml</span> e os
-            <span className="font-mono"> .env.example</span>, crie a estrutura de pastas e renomeie
+            <span className="font-mono"> .env.example</span> e, opcionalmente, o
+            <span className="font-mono"> frontend.conf</span>, crie a estrutura de pastas e renomeie
             o arquivo de raiz para <span className="font-mono">.env</span>. Exemplo:
             <code className="mx-1 block rounded bg-slate-900/80 px-2 py-1 text-[10px] text-slate-100">
               mkdir ai-hub-corp &amp;&amp; cd ai-hub-corp
               <br />
               cp ~/Downloads/docker-compose.yml .
               <br />
-              mkdir -p apps/backend apps/frontend apps/sandbox-orchestrator
+              mkdir -p apps/backend apps/frontend apps/sandbox-orchestrator infra/nginx
               <br />
               cp ~/Downloads/backend.env.example apps/backend/.env.example
               <br />
@@ -181,6 +205,8 @@ export default function DockerImagesPage() {
               cp ~/Downloads/sandbox-orchestrator.env.example apps/sandbox-orchestrator/.env.example
               <br />
               cp ~/Downloads/root.env.example .env.example
+              <br />
+              cp ~/Downloads/frontend.conf infra/nginx/frontend.conf
               <br />
               cp .env.example .env
             </code>
@@ -219,7 +245,7 @@ export default function DockerImagesPage() {
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{step.description}</p>
             {step.title.startsWith('2') && (
               <pre className="mt-3 rounded-lg bg-slate-900/90 text-slate-100 p-3 text-xs overflow-x-auto">
-                mkdir -p ai-hub-corp/apps/backend ai-hub-corp/apps/frontend ai-hub-corp/apps/sandbox-orchestrator
+                mkdir -p ai-hub-corp/apps/backend ai-hub-corp/apps/frontend ai-hub-corp/apps/sandbox-orchestrator ai-hub-corp/infra/nginx
               </pre>
             )}
             {step.title.startsWith('3') && (
