@@ -1589,3 +1589,41 @@ test('upload jobs disponibilizam zip final com fontes ajustados', async () => {
   assert.ok(entries.includes('README.md'));
   assert.ok(entries.every((entry) => !entry.startsWith('.git/')));
 });
+
+test('mantém workspace quando SANDBOX_KEEP_WORKSPACE=true', async () => {
+  const originalKeepWorkspace = process.env.SANDBOX_KEEP_WORKSPACE;
+  process.env.SANDBOX_KEEP_WORKSPACE = 'true';
+
+  const workspace = await fs.mkdtemp(path.join(os.tmpdir(), 'sandbox-keep-workspace-'));
+  const processor = new SandboxJobProcessor();
+
+  await (processor as any).cleanup(workspace);
+
+  const stat = await fs.stat(workspace);
+  assert.ok(stat.isDirectory());
+
+  await fs.rm(workspace, { recursive: true, force: true });
+  if (originalKeepWorkspace === undefined) {
+    delete process.env.SANDBOX_KEEP_WORKSPACE;
+  } else {
+    process.env.SANDBOX_KEEP_WORKSPACE = originalKeepWorkspace;
+  }
+});
+
+test('remove workspace quando SANDBOX_KEEP_WORKSPACE não está habilitado', async () => {
+  const originalKeepWorkspace = process.env.SANDBOX_KEEP_WORKSPACE;
+  delete process.env.SANDBOX_KEEP_WORKSPACE;
+
+  const workspace = await fs.mkdtemp(path.join(os.tmpdir(), 'sandbox-clean-workspace-'));
+  const processor = new SandboxJobProcessor();
+
+  await (processor as any).cleanup(workspace);
+
+  await assert.rejects(fs.stat(workspace));
+
+  if (originalKeepWorkspace === undefined) {
+    delete process.env.SANDBOX_KEEP_WORKSPACE;
+  } else {
+    process.env.SANDBOX_KEEP_WORKSPACE = originalKeepWorkspace;
+  }
+});
