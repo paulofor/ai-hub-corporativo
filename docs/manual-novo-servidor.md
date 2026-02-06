@@ -17,9 +17,9 @@ Este passo a passo descreve como preparar a nova VPS Linux em `163.245.203.201` 
 
 ```sh
 sudo apt-get update && sudo apt-get install -y git
-sudo mkdir -p /root/ai-hub-corporativo
-sudo git clone https://github.com/<SEU_USUARIO>/ai-hub-corporativo /root/ai-hub-corporativo
-cd /root/ai-hub-corporativo
+mkdir -p "$HOME/ai-hub-corporativo"
+git clone https://github.com/<SEU_USUARIO>/ai-hub-corporativo "$HOME/ai-hub-corporativo"
+cd "$HOME/ai-hub-corporativo"
 ```
 
 > Se o repositório for privado, faça o clone usando uma chave ou token com permissão de leitura.
@@ -42,12 +42,12 @@ Durante o wizard:
 
 ## 4) Colocar segredos locais necessários
 
-- **OpenAI**: grave a chave em `/root/infra/openai-token/openai_api_key` (ou ajuste `OPENAI_TOKEN_HOST_DIR` no `.env`). Se você já usa `/root/infra/openai-token/open_api_key`, o serviço também aceita esse nome.
+- **OpenAI**: grave a chave em `./infra/openai-token/openai_api_key` (ou ajuste `OPENAI_TOKEN_HOST_DIR` no `.env` para qualquer caminho acessível pelo seu usuário). Se você já usa `./infra/openai-token/open_api_key` ou caminhos antigos em `/root/infra/openai-token/open_api_key`, o serviço também aceita esse nome.
 - **Certificados TLS**: se já possui certificados válidos do servidor antigo, copie o conteúdo de `infra/nginx/letsencrypt` e `infra/nginx/certbot-www` para o mesmo caminho no novo host antes de subir os contêineres. Sem eles, será gerado um certificado autoassinado temporário.
 
 ## 5) Autenticar no registry e subir os contêineres
 
-Ainda em `/root/ai-hub-corporativo`:
+Ainda em `~/ai-hub-corporativo`:
 
 ```sh
 ./infra/bin/ensure-ghcr-login.sh
@@ -70,7 +70,7 @@ Isso vai baixar as imagens, criar a network externa `public-net` (se ainda não 
 
 - O workflow já aponta o `DEPLOY_HOST` para `163.245.203.201`.
 - Confirme que os secrets `VPS_SSH_KEY`, `GHCR_USERNAME` e `GHCR_TOKEN` estão preenchidos no repositório.
-- No próximo push para `main`, o GitHub Actions fará o `rsync` para `/root/ai-hub-corporativo` nesse novo servidor e rodará `docker compose pull && docker compose up -d` automaticamente.
+- No próximo push para `main`, o GitHub Actions fará o `rsync` para o diretório configurado no deploy (ajuste para `~/ai-hub-corporativo` se não usar root) nesse novo servidor e rodará `docker compose pull && docker compose up -d` automaticamente.
 
 Pronto! Após concluir os passos acima, a nova VPS estará preparada para receber deploys e servir o ambiente em produção.
 
@@ -83,7 +83,7 @@ o arquivo `ai-hub-images.tar` e o respectivo checksum `.sha256`.
 Caso precise regerar o pacote manualmente na VPS, rode:
 
 ```bash
-cd /root/ai-hub-corporativo
+cd "$HOME/ai-hub-corporativo"
 export BACKEND_IMAGE=ghcr.io/<USUARIO>/ai-hub-corporativo-backend:latest
 export FRONTEND_IMAGE=ghcr.io/<USUARIO>/ai-hub-corporativo-frontend:latest
 export SANDBOX_ORCHESTRATOR_IMAGE=ghcr.io/<USUARIO>/ai-hub-corporativo-sandbox:latest

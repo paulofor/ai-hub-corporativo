@@ -17,15 +17,16 @@ interface ApiKeyResolution {
 }
 
 function logVolumeMappings() {
-  const tokenHostDir = validateString(process.env.OPENAI_TOKEN_HOST_DIR) ?? '/root/infra/openai-token';
+  const tokenHostDir = validateString(process.env.OPENAI_TOKEN_HOST_DIR) ?? './infra/openai-token';
   const tokenContainerDir = '/run/secrets/openai-token';
-  const sandboxWorkdir = validateString(process.env.SANDBOX_WORKDIR) ?? '/root/ai-hub-corporativo/src';
+  const sandboxWorkdirHost = validateString(process.env.SANDBOX_WORKDIR_HOST) ?? './src';
+  const sandboxWorkdir = validateString(process.env.SANDBOX_WORKDIR) ?? '/workspace/ai-hub-corporativo/src';
 
   console.log(
     `Sandbox orchestrator: mapeamento OPENAI_TOKEN_HOST_DIR ${tokenHostDir} (host) -> ${tokenContainerDir} (container)`,
   );
   console.log(
-    `Sandbox orchestrator: mapeamento SANDBOX_WORKDIR ${sandboxWorkdir} (host) -> ${sandboxWorkdir} (container)`,
+    `Sandbox orchestrator: mapeamento SANDBOX_WORKDIR_HOST ${sandboxWorkdirHost} (host) -> SANDBOX_WORKDIR ${sandboxWorkdir} (container)`,
   );
 }
 
