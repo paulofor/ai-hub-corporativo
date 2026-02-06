@@ -40,6 +40,7 @@ export class SandboxJobProcessor implements JobProcessor {
   private readonly economyToolOutputStringLimit: number;
   private readonly economyToolOutputSerializedLimit: number;
   private readonly economyHttpToolMaxResponseChars: number;
+  private readonly keepWorkspace: boolean;
 
   constructor(
     apiKey?: string,
@@ -95,6 +96,7 @@ export class SandboxJobProcessor implements JobProcessor {
       Math.min(this.httpToolMaxResponseChars, 8_000),
     );
     this.economyHttpToolMaxResponseChars = Math.min(economyHttpMaxCharsRaw, this.httpToolMaxResponseChars);
+    this.keepWorkspace = this.parseBoolean(process.env.SANDBOX_KEEP_WORKSPACE, false);
   }
 
   async process(job: SandboxJob): Promise<void> {
@@ -592,11 +594,28 @@ ${block}` : block;
   }
 
   private async cleanup(workspace: string): Promise<void> {
+    if (this.keepWorkspace) {
+      return;
+    }
     try {
       await fs.rm(workspace, { recursive: true, force: true });
     } catch (err) {
       // noop
     }
+  }
+
+  private parseBoolean(rawValue: string | undefined, fallback: boolean): boolean {
+    if (!rawValue || !rawValue.trim()) {
+      return fallback;
+    }
+    const normalized = rawValue.trim().toLowerCase();
+    if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+      return true;
+    }
+    if (['0', 'false', 'no', 'off'].includes(normalized)) {
+      return false;
+    }
+    return fallback;
   }
 
   private async cloneRepository(job: SandboxJob, repoPath: string, cloneUrl: string): Promise<void> {
