@@ -10,7 +10,7 @@ FROM node:20-bookworm-slim AS production
 ARG CFR_VERSION=0.152
 WORKDIR /app
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends git python3 python3-pip patch openjdk-21-jdk maven ripgrep curl ca-certificates gnupg bash \
+  && apt-get install -y --no-install-recommends git python3 python3-pip patch default-jdk maven ripgrep curl ca-certificates gnupg bash \
   && curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
   && echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" >/etc/apt/sources.list.d/google-cloud-sdk.list \
   && apt-get update \
