@@ -176,13 +176,14 @@ export class SandboxJobProcessor implements JobProcessor {
       this.log(job, `falha ao processar job: ${job.error}`);
     } finally {
       job.updatedAt = new Date().toISOString();
-      this.log(
-        job,
-        this.keepWorkspace
-          ? `SANDBOX_KEEP_WORKSPACE=true; preservando workspace ${workspace} para depuração`
-          : `limpando workspace ${workspace}`,
-      );
-      await this.cleanup(workspace);
+      this.log(job, `limpeza automática do workspace desabilitada; preservando ${workspace}`);
+      // this.log(
+      //   job,
+      //   this.keepWorkspace
+      //     ? `SANDBOX_KEEP_WORKSPACE=true; preservando workspace ${workspace} para depuração`
+      //     : `limpando workspace ${workspace}`,
+      // );
+      // await this.cleanup(workspace);
     }
   }
 
