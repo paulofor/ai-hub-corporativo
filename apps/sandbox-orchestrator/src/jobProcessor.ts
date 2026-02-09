@@ -447,7 +447,7 @@ ${block}` : block;
   }
 
   private async ensureGitlabMavenSettings(job: SandboxJob, token: string, repoPath: string): Promise<void> {
-    const m2Dir = path.join('/root', '.m2');
+    const m2Dir = path.join(os.homedir(), '.m2');
     try {
       await fs.mkdir(m2Dir, { recursive: true });
     } catch (err) {
@@ -479,9 +479,9 @@ ${block}` : block;
       const message = err instanceof Error ? err.message : String(err);
       throw new Error(`não foi possível salvar ${settingsPath}: ${message}`);
     }
-    this.log(job, `arquivo /root/.m2/settings.xml atualizado para ${repoIds.join(', ')}`);
+    this.log(job, `arquivo ${settingsPath} atualizado para ${repoIds.join(', ')}`);
     const safeContent = this.redactSecrets(content, token);
-    this.log(job, `conteúdo atual de /root/.m2/settings.xml (redigido):\n${safeContent}`);
+    this.log(job, `conteúdo atual de ${settingsPath} (redigido):\n${safeContent}`);
   }
 
   private mergeMavenSettings(existing: string, snippet: string): string {
