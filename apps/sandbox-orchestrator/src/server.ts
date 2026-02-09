@@ -47,7 +47,7 @@ function readKeyFile(path?: string): string | undefined {
     return content || undefined;
   } catch (err) {
     const code = (err as NodeJS.ErrnoException)?.code;
-    if (code !== 'ENOENT') {
+    if (!['ENOENT', 'EACCES', 'EPERM'].includes(code ?? '')) {
       console.warn(`Sandbox orchestrator: falha ao ler chave OpenAI em ${path}:`, err);
     }
     return undefined;
