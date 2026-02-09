@@ -487,7 +487,7 @@ ${block}` : block;
   private mergeMavenSettings(existing: string, snippet: string): string {
     const start = '<!-- ai-hub gitlab token start -->';
     const end = '<!-- ai-hub gitlab token end -->';
-    const markerRegex = new RegExp(`${start}[\s\S]*?${end}\n?`, 'g');
+    const markerRegex = new RegExp(`${start}[\\s\\S]*?${end}\n?`, 'g');
     const hasContent = existing && existing.trim().length > 0;
     if (!hasContent) {
       return this.wrapMavenSettings(snippet);

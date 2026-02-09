@@ -20,6 +20,29 @@ class StubProcessor implements JobProcessor {
   }
 }
 
+async function withGitlabSettingsBackup(action: (settingsPath: string) => Promise<void>) {
+  const settingsPath = path.join('/root', '.m2', 'settings.xml');
+  let backup: Buffer | null = null;
+  try {
+    backup = await fs.readFile(settingsPath);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+      throw err;
+    }
+  }
+
+  try {
+    await action(settingsPath);
+  } finally {
+    if (backup) {
+      await fs.mkdir(path.dirname(settingsPath), { recursive: true });
+      await fs.writeFile(settingsPath, backup, { mode: 0o600 });
+    } else {
+      await fs.rm(settingsPath, { force: true });
+    }
+  }
+}
+
 test('reports python availability on healthcheck', async () => {
   const app = createApp({ processor: new StubProcessor() });
   const response = await request(app).get('/health').expect(200);
@@ -217,10 +240,11 @@ test('materializa chave SSH personalizada para jobs de upload', async () => {
 });
 
 test('materializa token do GitLab e gera settings do Maven', async () => {
-  const workspace = await fs.mkdtemp(path.join(os.tmpdir(), 'sandbox-gitlab-token-'));
-  const repoPath = path.join(workspace, 'repo');
-  await fs.mkdir(repoPath, { recursive: true });
-  const pom = `<project>
+  await withGitlabSettingsBackup(async (settingsPath) => {
+    const workspace = await fs.mkdtemp(path.join(os.tmpdir(), 'sandbox-gitlab-token-'));
+    const repoPath = path.join(workspace, 'repo');
+    await fs.mkdir(repoPath, { recursive: true });
+    const pom = `<project>
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.example</groupId>
   <artifactId>demo</artifactId>
@@ -232,39 +256,93 @@ test('materializa token do GitLab e gera settings do Maven', async () => {
     </repository>
   </repositories>
 </project>`;
-  await fs.writeFile(path.join(repoPath, 'pom.xml'), pom);
+    await fs.writeFile(path.join(repoPath, 'pom.xml'), pom);
 
-  const processor = new SandboxJobProcessor();
-  const token = 'glpat-1234567890';
-  const now = new Date().toISOString();
-  const job: SandboxJob = {
-    jobId: 'job-gitlab-token',
-    repoUrl: 'upload://job-gitlab-token',
-    branch: 'upload',
-    taskDescription: 'noop',
-    status: 'PENDING',
-    logs: [],
-    createdAt: now,
-    updatedAt: now,
-    sandboxPath: workspace,
-    gitlabPersonalAccessToken: { base64: Buffer.from(token).toString('base64'), filename: 'gitlab.key' },
-  } as SandboxJob;
+    const processor = new SandboxJobProcessor();
+    const token = 'glpat-1234567890';
+    const now = new Date().toISOString();
+    const job: SandboxJob = {
+      jobId: 'job-gitlab-token',
+      repoUrl: 'upload://job-gitlab-token',
+      branch: 'upload',
+      taskDescription: 'noop',
+      status: 'PENDING',
+      logs: [],
+      createdAt: now,
+      updatedAt: now,
+      sandboxPath: workspace,
+      gitlabPersonalAccessToken: { base64: Buffer.from(token).toString('base64'), filename: 'gitlab.key' },
+    } as SandboxJob;
 
-  await (processor as any).materializeGitlabPersonalAccessToken(job, repoPath);
+    try {
+      await (processor as any).materializeGitlabPersonalAccessToken(job, repoPath);
 
-  const settingsPath = path.join('/root', '.m2', 'settings.xml');
-  const settings = await fs.readFile(settingsPath, 'utf-8');
-  assert.ok(settings.includes('bvsnet-internal'));
-  assert.ok(settings.includes(token));
+      const settings = await fs.readFile(settingsPath, 'utf-8');
+      assert.ok(settings.includes('bvsnet-internal'));
+      assert.ok(settings.includes(token));
 
-  const envResult = await (processor as any).handleRunShell(
-    { command: ['sh', '-c', 'echo $GITLAB_PERSONAL_ACCESS_TOKEN'], cwd: '.' },
-    repoPath,
-    job,
-  );
-  assert.equal(envResult.stdout.trim(), token);
+      const envResult = await (processor as any).handleRunShell(
+        { command: ['sh', '-c', 'echo $GITLAB_PERSONAL_ACCESS_TOKEN'], cwd: '.' },
+        repoPath,
+        job,
+      );
+      assert.equal(envResult.stdout.trim(), token);
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
+});
 
-  await fs.rm(workspace, { recursive: true, force: true });
+test('reaplica token do GitLab substituindo snippet existente sem duplicar blocos', async () => {
+  await withGitlabSettingsBackup(async (settingsPath) => {
+    const workspace = await fs.mkdtemp(path.join(os.tmpdir(), 'sandbox-gitlab-token-refresh-'));
+    const repoPath = path.join(workspace, 'repo');
+    await fs.mkdir(repoPath, { recursive: true });
+    const pom = `<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.example</groupId>
+  <artifactId>demo</artifactId>
+  <version>1.0.0</version>
+  <repositories>
+    <repository>
+      <id>bvsnet-internal</id>
+      <url>https://gitlab.bvsnet.com.br/-/package-router/maven</url>
+    </repository>
+  </repositories>
+</project>`;
+    await fs.writeFile(path.join(repoPath, 'pom.xml'), pom);
+
+    const processor = new SandboxJobProcessor();
+    const firstToken = 'glpat-0000000001';
+    const job: SandboxJob = {
+      jobId: 'job-gitlab-token-refresh',
+      repoUrl: 'upload://job-gitlab-token-refresh',
+      branch: 'upload',
+      taskDescription: 'noop',
+      status: 'PENDING',
+      logs: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      sandboxPath: workspace,
+      gitlabPersonalAccessToken: { base64: Buffer.from(firstToken).toString('base64'), filename: 'gitlab.key' },
+    } as SandboxJob;
+
+    try {
+      await (processor as any).materializeGitlabPersonalAccessToken(job, repoPath);
+
+      const secondToken = 'glpat-9999999999';
+      job.gitlabPersonalAccessToken = { base64: Buffer.from(secondToken).toString('base64'), filename: 'gitlab.key' };
+      await (processor as any).materializeGitlabPersonalAccessToken(job, repoPath);
+
+      const settings = await fs.readFile(settingsPath, 'utf-8');
+      const occurrences = settings.match(/<!-- ai-hub gitlab token start -->/g)?.length ?? 0;
+      assert.equal(occurrences, 1, 'blocos do Maven devem ser únicos');
+      assert.ok(settings.includes(secondToken));
+      assert.ok(!settings.includes(firstToken));
+    } finally {
+      await fs.rm(workspace, { recursive: true, force: true });
+    }
+  });
 });
 
 test('falha com mensagem clara quando arquivo enviado no campo de PAT é uma chave SSH', async () => {
