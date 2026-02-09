@@ -74,7 +74,6 @@ test('rejects invalid payload', async () => {
   await request(app).post('/jobs').send({}).expect(400);
 });
 
-test('accepts upload job without repo url', async () => {
 test('accepts upload job with problem files', async () => {
   const registry = new Map<string, SandboxJob>();
   const app = createApp({ jobRegistry: registry, processor: new StubProcessor() });
@@ -95,6 +94,7 @@ test('accepts upload job with problem files', async () => {
   assert.equal(stored?.problemFiles?.[0].filename, 'erros.csv');
 });
 
+test('accepts upload job without repo url', async () => {
   const registry = new Map<string, SandboxJob>();
   const app = createApp({ jobRegistry: registry, processor: new StubProcessor() });
   const zip = new AdmZip();
