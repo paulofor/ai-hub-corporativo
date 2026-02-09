@@ -252,7 +252,7 @@ test('materializa token do GitLab e gera settings do Maven', async () => {
 
   await (processor as any).materializeGitlabPersonalAccessToken(job, repoPath);
 
-  const settingsPath = path.join(workspace, '.m2', 'settings.xml');
+  const settingsPath = path.join('/root', '.m2', 'settings.xml');
   const settings = await fs.readFile(settingsPath, 'utf-8');
   assert.ok(settings.includes('bvsnet-internal'));
   assert.ok(settings.includes(token));
