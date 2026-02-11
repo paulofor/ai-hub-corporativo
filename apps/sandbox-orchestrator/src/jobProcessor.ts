@@ -883,6 +883,8 @@ Modo econômico ativo: minimize leituras extensas, priorize comandos curtos, esc
       : '';
     const problemFilesInstruction = this.describeProblemFiles(job, repoPath);
     const javaDecompilerInstruction = '\nO utilitário `cfr` está instalado para decompilar arquivos .class de Java: execute `cfr <arquivo.class>` para gerar uma versão legível do código.';
+    const pdfInstruction =
+      '\nO pacote `poppler-utils` está disponível no ambiente. Quando houver PDF nos arquivos adicionais enviados pelo usuário, prefira extrair texto com `pdftotext <arquivo.pdf> -` (ou para um arquivo de saída) antes de analisar.';
     const internetAccessInstruction =
       '\nSe precisar consultar documentação, artigos ou quaisquer materiais públicos na internet, use a tool `http_get` (somente requisições GET sem autenticação ou headers sensíveis).';
     const messages: ResponseItem[] = [
@@ -895,7 +897,7 @@ Modo econômico ativo: minimize leituras extensas, priorize comandos curtos, esc
             type: 'input_text',
             text: `Você está operando em um sandbox isolado em ${repoPath}. Use as tools para ler, alterar arquivos e executar comandos. Test command sugerido: ${
               job.testCommand ?? 'n/d'
-            }. Sempre trabalhe somente dentro do diretório do repositório. Prefira usar o comando rg para buscas recursivas em vez de grep -R, que é mais lento.${profileInstruction}${problemFilesInstruction}${javaDecompilerInstruction}${internetAccessInstruction}`,
+            }. Sempre trabalhe somente dentro do diretório do repositório. Prefira usar o comando rg para buscas recursivas em vez de grep -R, que é mais lento.${profileInstruction}${problemFilesInstruction}${javaDecompilerInstruction}${pdfInstruction}${internetAccessInstruction}`,
           },
         ],
       },

@@ -37,6 +37,7 @@ O fluxo de automação agora centraliza a execução das correções no `sandbox
 
 - O contêiner do sandbox agora inclui o utilitário `apply_patch` (wrapper para `patch`/`gpatch`) em `/usr/local/bin`. Ele aceita patches com o marcador `*** Begin Patch` ou diffs tradicionais, permitindo edições segmentadas sem reescrever arquivos completos.
 - A tool `http_get` permite que o modelo leia conteúdos públicos via HTTP GET, respeitando os bloqueios de hosts locais e privados e sem encaminhar cabeçalhos sensíveis.
+- O pacote `poppler-utils` também está presente no contêiner para lidar com PDFs; em uploads com arquivos `.pdf`, o modelo é orientado a usar `pdftotext` para converter o conteúdo em texto antes da análise.
 
 ## Upload de fontes via ZIP
 

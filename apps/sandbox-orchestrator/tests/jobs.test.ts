@@ -571,6 +571,8 @@ test('makes problem files available to the model inside the sandbox', async () =
   const systemText = systemMessage?.content?.find((c: any) => c.type === 'input_text')?.text ?? '';
   assert.ok(systemText.includes('.aihub/problem-files'), 'system message should mention problem files');
   assert.ok(systemText.includes('erros.txt'));
+  assert.ok(systemText.includes('poppler-utils'));
+  assert.ok(systemText.includes('pdftotext <arquivo.pdf> -'));
 
   await fs.rm(workspace, { recursive: true, force: true });
   await fs.rm(tempRepo, { recursive: true, force: true });
