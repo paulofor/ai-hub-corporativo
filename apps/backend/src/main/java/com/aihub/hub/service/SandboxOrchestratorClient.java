@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -59,7 +60,7 @@ public class SandboxOrchestratorClient {
             .uri(jobsPath)
             .contentType(MediaType.APPLICATION_JSON)
             .body(body)
-            , "criar job", false);
+            , "criar job", false, false);
 
         return SandboxOrchestratorJobResponse.from(response);
     }
@@ -125,7 +126,7 @@ public class SandboxOrchestratorClient {
             .uri(jobsPath)
             .contentType(MediaType.APPLICATION_JSON)
             .body(body)
-            , "criar job upload", false);
+            , "criar job upload", false, false);
 
         return SandboxOrchestratorJobResponse.from(response);
     }
@@ -134,13 +135,51 @@ public class SandboxOrchestratorClient {
         log.info("Consultando job {} no sandbox-orchestrator", jobId);
         JsonNode response = executeForJsonResponse(restClient.get()
             .uri(jobsPath + "/" + jobId)
-            , "consultar job", true);
+            , "consultar job", true, true);
         return SandboxOrchestratorJobResponse.from(response);
+    }
+
+    public ResultZipDownload getResultZip(String jobId) {
+        return restClient.get()
+            .uri(jobsPath + "/" + jobId + "/result-zip")
+            .exchange((request, response) -> {
+                HttpStatusCode status = response.getStatusCode();
+                MediaType contentType = response.getHeaders().getContentType();
+
+                if (status.value() == 404 || status.value() == 409) {
+                    discardBody(response);
+                    return null;
+                }
+
+                if (!status.is2xxSuccessful()) {
+                    String body = readBodyForLog(response);
+                    logIfNeeded(status, contentType, body);
+                    throw new IllegalStateException(buildErrorMessage(status, contentType));
+                }
+
+                if (!isZipContentType(contentType)) {
+                    String body = readBodyForLog(response);
+                    logIfNeeded(status, contentType, body);
+                    throw new IllegalStateException(buildErrorMessage(status, contentType));
+                }
+
+                try (InputStream body = response.getBody()) {
+                    if (body == null) {
+                        return null;
+                    }
+                    byte[] zipBytes = readAllBytes(body);
+                    String filename = response.getHeaders().getFirst("Content-Disposition");
+                    return new ResultZipDownload(zipBytes, extractFilename(filename));
+                } catch (IOException ex) {
+                    throw new IllegalStateException("Falha ao ler ZIP retornado pelo sandbox-orchestrator", ex);
+                }
+            });
     }
 
     private JsonNode executeForJsonResponse(RestClient.RequestHeadersSpec<?> requestSpec,
                                             String operationDescription,
-                                            boolean allowNotFound) {
+                                            boolean allowNotFound,
+                                            boolean allowZipContent) {
         return requestSpec.exchange((request, response) -> {
             HttpStatusCode status = response.getStatusCode();
             MediaType contentType = response.getHeaders().getContentType();
@@ -158,6 +197,9 @@ public class SandboxOrchestratorClient {
             }
 
             if (!isJsonContentType(contentType)) {
+                if (allowZipContent && isZipContentType(contentType)) {
+                    return readZipAsJsonPayload(response, status);
+                }
                 String body = readBodyForLog(response);
                 logIfNeeded(status, contentType, body);
                 throw new IllegalStateException(buildErrorMessage(status, contentType));
@@ -224,6 +266,33 @@ public class SandboxOrchestratorClient {
         }
     }
 
+    private JsonNode readZipAsJsonPayload(RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse response,
+                                          HttpStatusCode status) {
+        try (InputStream body = response.getBody()) {
+            if (body == null) {
+                throw new IllegalStateException("sandbox-orchestrator retornou " + status.value() + " com corpo vazio");
+            }
+            byte[] zipBytes = readAllBytes(body);
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("status", "COMPLETED");
+            payload.put("resultZipBase64", java.util.Base64.getEncoder().encodeToString(zipBytes));
+            payload.put("resultZipReady", true);
+            return objectMapper.valueToTree(payload);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Falha ao ler ZIP retornado pelo sandbox-orchestrator", ex);
+        }
+    }
+
+    private byte[] readAllBytes(InputStream inputStream) throws IOException {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int read;
+        while ((read = inputStream.read(buffer)) != -1) {
+            outputStream.write(buffer, 0, read);
+        }
+        return outputStream.toByteArray();
+    }
+
     private void logIfNeeded(HttpStatusCode status, MediaType contentType, String body) {
         log.warn("Resposta inesperada do sandbox-orchestrator: status={}, content-type={}, body={}",
             status.value(),
@@ -261,6 +330,37 @@ public class SandboxOrchestratorClient {
         }
         String subtype = contentType.getSubtype();
         return subtype != null && subtype.endsWith("+json");
+    }
+
+    private boolean isZipContentType(MediaType contentType) {
+        if (contentType == null) {
+            return false;
+        }
+        return MediaType.APPLICATION_OCTET_STREAM.isCompatibleWith(contentType)
+            || MediaType.valueOf("application/zip").isCompatibleWith(contentType)
+            || "zip".equalsIgnoreCase(contentType.getSubtype());
+    }
+
+    private String extractFilename(String contentDisposition) {
+        if (contentDisposition == null || contentDisposition.isBlank()) {
+            return null;
+        }
+        String[] parts = contentDisposition.split(";");
+        for (String part : parts) {
+            String trimmed = part.trim();
+            if (!trimmed.toLowerCase().startsWith("filename=")) {
+                continue;
+            }
+            String value = trimmed.substring("filename=".length()).trim();
+            if (value.startsWith("\"") && value.endsWith("\"") && value.length() >= 2) {
+                value = value.substring(1, value.length() - 1);
+            }
+            return value.isBlank() ? null : value;
+        }
+        return null;
+    }
+
+    public record ResultZipDownload(byte[] bytes, String filename) {
     }
 
     public record SandboxOrchestratorJobResponse(

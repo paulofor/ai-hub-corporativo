@@ -158,6 +158,16 @@ public class SandboxUploadService {
 
         String inlineZip = sanitizeBase64(record.getResultZipBase64());
         if (inlineZip == null) {
+            SandboxOrchestratorClient.ResultZipDownload remoteZip = sandboxOrchestratorClient.getResultZip(jobId);
+            if (remoteZip != null && remoteZip.bytes() != null && remoteZip.bytes().length > 0) {
+                inlineZip = Base64.getEncoder().encodeToString(remoteZip.bytes());
+                handleResultZip(record, inlineZip);
+                Optional.ofNullable(remoteZip.filename()).ifPresent(record::setResultZipFilename);
+                record.setUpdatedAt(Instant.now());
+                uploadJobRepository.save(record);
+                return new ResultZip(resolveZipFilename(record), remoteZip.bytes());
+            }
+
             SandboxOrchestratorClient.SandboxOrchestratorJobResponse payload = sandboxOrchestratorClient.getJob(jobId);
             if (payload == null || sanitizeBase64(payload.resultZipBase64()) == null) {
                 throw new IllegalStateException("ZIP ainda não está disponível para download");
