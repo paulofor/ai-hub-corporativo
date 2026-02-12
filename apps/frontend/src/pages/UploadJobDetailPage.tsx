@@ -24,14 +24,8 @@ export default function UploadJobDetailPage() {
     }
     setLoading(true);
     setError(null);
-    try {
-      const response = await client.get(`/upload-jobs/${jobId}?refresh=true`);
-      if (!response.data) {
-        setError('Job não encontrado no sandbox.');
-        setJob(null);
-        return;
-      }
-      const parsed = parseUploadJob(response.data);
+    const applyJobPayload = (payload: unknown) => {
+      const parsed = parseUploadJob(payload);
       setJob((current) => {
         const resolvedJobId = parsed.jobId || jobId;
         const nextJob: UploadJob = {
@@ -47,8 +41,30 @@ export default function UploadJobDetailPage() {
         };
         return nextJob;
       });
+    };
+    try {
+      const response = await client.get(`/upload-jobs/${jobId}?refresh=true`);
+      if (!response.data) {
+        setError('Job não encontrado no sandbox.');
+        setJob(null);
+        return;
+      }
+      applyJobPayload(response.data);
     } catch (err) {
-      setError((err as Error).message);
+      const refreshError = (err as Error).message;
+      try {
+        const fallbackResponse = await client.get(`/upload-jobs/${jobId}`);
+        if (!fallbackResponse.data) {
+          setError(refreshError);
+          return;
+        }
+        applyJobPayload(fallbackResponse.data);
+        setError(
+          `${refreshError} (exibindo último status salvo; use “Baixar ZIP” se o resultado já estiver pronto)`
+        );
+      } catch {
+        setError(refreshError);
+      }
     } finally {
       setLoading(false);
     }
