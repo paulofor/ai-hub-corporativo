@@ -162,6 +162,29 @@ function parseGitlabPersonalAccessToken(raw: unknown): UploadedGitlabPersonalAcc
   return { base64, filename: filename ?? undefined };
 }
 
+function buildJobResponse(job: SandboxJob) {
+  const {
+    uploadedZip,
+    applicationDefaultCredentials,
+    gitSshPrivateKey,
+    gitlabPersonalAccessToken,
+    problemFiles,
+    gitlabPatValue,
+    resultZipBase64,
+    ...publicJob
+  } = job;
+
+  return {
+    ...publicJob,
+    resultZipReady: Boolean(resultZipBase64),
+    hasUploadedZip: Boolean(uploadedZip),
+    problemFilesCount: problemFiles?.length ?? 0,
+    hasApplicationDefaultCredentials: Boolean(applicationDefaultCredentials),
+    hasGitSshPrivateKey: Boolean(gitSshPrivateKey),
+    hasGitlabPersonalAccessToken: Boolean(gitlabPersonalAccessToken),
+  };
+}
+
 export function createApp(options: AppOptions = {}) {
   const jobRegistry = options.jobRegistry ?? new Map<string, SandboxJob>();
   logVolumeMappings();
@@ -286,7 +309,7 @@ export function createApp(options: AppOptions = {}) {
     const existing = jobRegistry.get(jobId);
     if (existing) {
       console.log(`Sandbox orchestrator: received duplicate job ${jobId}, returning cached status ${existing.status}`);
-      return res.json(existing);
+      return res.json(buildJobResponse(existing));
     }
 
     const sourceLabel = isUpload ? `upload ${uploadedZipName ?? 'fonte.zip'}` : repoSlug ?? repoUrl;
@@ -330,7 +353,7 @@ export function createApp(options: AppOptions = {}) {
         jobRegistry.set(jobId, job);
       });
 
-    res.status(201).json(job);
+    res.status(201).json(buildJobResponse(job));
   });
 
   app.get('/jobs/:id', (req: Request, res: Response) => {
@@ -339,7 +362,25 @@ export function createApp(options: AppOptions = {}) {
       return res.status(404).json({ error: 'job not found' });
     }
     markStaleJobIfNeeded(job);
-    res.json(job);
+    res.json(buildJobResponse(job));
+  });
+
+  app.get('/jobs/:id/result-zip', (req: Request, res: Response) => {
+    const job = jobRegistry.get(req.params.id);
+    if (!job) {
+      return res.status(404).json({ error: 'job not found' });
+    }
+
+    const base64 = validateString(job.resultZipBase64);
+    if (!base64) {
+      return res.status(409).json({ error: 'result zip not available' });
+    }
+
+    const buffer = Buffer.from(base64, 'base64');
+    const filename = validateString(job.resultZipFilename) ?? `${job.jobId}-resultado.zip`;
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.status(200).send(buffer);
   });
 
   app.use((err: Error & { type?: string; limit?: number }, _req: Request, res: Response, _next: () => void) => {

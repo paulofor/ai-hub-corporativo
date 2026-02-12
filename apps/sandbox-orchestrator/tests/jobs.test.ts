@@ -512,6 +512,62 @@ test('returns job status', async () => {
 
   const response = await request(app).get('/jobs/job-1').expect(200);
   assert.equal(response.body.jobId, 'job-1');
+  assert.equal(response.body.resultZipBase64, undefined);
+  assert.equal(response.body.resultZipReady, false);
+});
+
+test('downloads result zip from dedicated endpoint', async () => {
+  const registry = new Map<string, SandboxJob>();
+  const processor = new StubProcessor();
+  const app = createApp({ jobRegistry: registry, processor });
+  const zipBytes = Buffer.from('fake zip bytes');
+
+  registry.set('job-with-zip', {
+    jobId: 'job-with-zip',
+    repoUrl: 'upload://job-with-zip',
+    branch: 'upload',
+    taskDescription: 'noop',
+    status: 'COMPLETED',
+    logs: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    resultZipBase64: zipBytes.toString('base64'),
+    resultZipFilename: 'resultado.zip',
+  });
+
+  const response = await request(app)
+    .get('/jobs/job-with-zip/result-zip')
+    .buffer(true)
+    .parse((res, callback) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+      res.on('end', () => callback(null, Buffer.concat(chunks)));
+      res.on('error', (err) => callback(err, Buffer.alloc(0)));
+    })
+    .expect(200);
+  assert.equal(response.header['content-type'], 'application/zip');
+  assert.match(response.header['content-disposition'], /resultado\.zip/);
+  const receivedBody = response.body as Buffer;
+  assert.deepEqual(receivedBody, zipBytes);
+});
+
+test('returns 409 when result zip is not available', async () => {
+  const registry = new Map<string, SandboxJob>();
+  const processor = new StubProcessor();
+  const app = createApp({ jobRegistry: registry, processor });
+
+  registry.set('job-without-zip', {
+    jobId: 'job-without-zip',
+    repoUrl: 'upload://job-without-zip',
+    branch: 'upload',
+    taskDescription: 'noop',
+    status: 'RUNNING',
+    logs: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+
+  await request(app).get('/jobs/job-without-zip/result-zip').expect(409);
 });
 
 test('makes problem files available to the model inside the sandbox', async () => {
