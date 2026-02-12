@@ -1,6 +1,7 @@
 package com.aihub.hub.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadConstraints;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -31,6 +32,7 @@ public class SandboxOrchestratorClient {
     private final RestClient restClient;
     private final String jobsPath;
     private final ObjectMapper objectMapper;
+    private final ObjectMapper largePayloadObjectMapper;
 
     public SandboxOrchestratorClient(
         RestClient sandboxOrchestratorRestClient,
@@ -40,6 +42,10 @@ public class SandboxOrchestratorClient {
         this.restClient = sandboxOrchestratorRestClient;
         this.objectMapper = objectMapper;
         this.jobsPath = jobsPath;
+        this.largePayloadObjectMapper = objectMapper.copy();
+        this.largePayloadObjectMapper.getFactory().setStreamReadConstraints(
+            StreamReadConstraints.builder().maxStringLength(Integer.MAX_VALUE).build()
+        );
     }
 
     public SandboxOrchestratorJobResponse createJob(SandboxJobRequest request) {
@@ -211,7 +217,7 @@ public class SandboxOrchestratorClient {
             if (body == null) {
                 throw new IllegalStateException("sandbox-orchestrator retornou " + status.value() + " com corpo vazio");
             }
-            JsonNode node = objectMapper.readTree(body);
+            JsonNode node = largePayloadObjectMapper.readTree(body);
             if (node == null || node.isMissingNode()) {
                 throw new IllegalStateException("sandbox-orchestrator retornou " + status.value() + " com corpo vazio");
             }
