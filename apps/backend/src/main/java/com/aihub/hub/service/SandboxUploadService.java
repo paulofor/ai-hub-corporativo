@@ -135,8 +135,12 @@ public class SandboxUploadService {
             SandboxOrchestratorClient.SandboxOrchestratorJobResponse orchestratorResponse =
                 sandboxOrchestratorClient.getJob(jobId);
             if (orchestratorResponse == null) {
-                record.setStatus("FAILED");
-                record.setError("Job não encontrado no sandbox-orchestrator");
+                if (isTerminalStatus(record.getStatus())) {
+                    record.setSummary("Job não encontrado no sandbox-orchestrator; exibindo último estado salvo localmente.");
+                } else {
+                    record.setStatus("FAILED");
+                    record.setError("Job não encontrado no sandbox-orchestrator");
+                }
             } else {
                 populateFromOrchestrator(record, orchestratorResponse);
             }
@@ -257,6 +261,13 @@ public class SandboxUploadService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private boolean isTerminalStatus(String status) {
+        if (status == null) {
+            return false;
+        }
+        return "COMPLETED".equalsIgnoreCase(status) || "FAILED".equalsIgnoreCase(status);
     }
 
     private boolean isCompleted(String status) {
