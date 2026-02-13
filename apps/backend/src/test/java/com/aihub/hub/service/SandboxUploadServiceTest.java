@@ -10,6 +10,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -85,5 +87,40 @@ class SandboxUploadServiceTest {
         assertThat(result.error()).isEqualTo("Job não encontrado no sandbox-orchestrator");
         verify(uploadJobRepository).save(record);
         verify(tokenCostCalculator, never()).calculate(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void getJobRefreshShouldMarkZipReadyWhenOrchestratorReturnsRemoteOnlyZip() {
+        UploadJobRecord record = new UploadJobRecord();
+        record.setJobId("job-zip");
+        record.setTaskDescription("Preparar artefato");
+        record.setStatus("RUNNING");
+
+        when(uploadJobRepository.findByJobId("job-zip")).thenReturn(Optional.of(record));
+        when(sandboxOrchestratorClient.getJob("job-zip")).thenReturn(new SandboxOrchestratorClient.SandboxOrchestratorJobResponse(
+            "job-zip",
+            "COMPLETED",
+            "ok",
+            List.of("file.txt"),
+            null,
+            null,
+            Boolean.TRUE,
+            "resultado.zip",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            BigDecimal.ZERO
+        ));
+
+        UploadJobView result = sandboxUploadService.getJob("job-zip", true);
+
+        assertThat(result.status()).isEqualTo("COMPLETED");
+        assertThat(result.resultZipReady()).isTrue();
+        assertThat(result.resultZipBase64()).isNull();
+        assertThat(result.resultZipFilename()).isEqualTo("resultado.zip");
+        verify(uploadJobRepository).save(record);
     }
 }

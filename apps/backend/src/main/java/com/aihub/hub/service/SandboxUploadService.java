@@ -195,6 +195,13 @@ public class SandboxUploadService {
         String inlineZip = sanitizeBase64(payload.resultZipBase64());
         if (inlineZip != null) {
             handleResultZip(record, inlineZip);
+        } else if (Boolean.TRUE.equals(payload.resultZipReady())) {
+            record.setResultZipReady(Boolean.TRUE);
+            record.setResultZipBase64(null);
+            log.info(
+                "Job {} sinalizou ZIP pronto no sandbox (sem base64 inline); download será via endpoint remoto",
+                record.getJobId()
+            );
         } else if (!isCompleted(payload.status())) {
             record.setResultZipReady(Boolean.FALSE);
             record.setResultZipBase64(null);

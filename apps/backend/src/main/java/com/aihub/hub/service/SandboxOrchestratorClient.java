@@ -370,6 +370,7 @@ public class SandboxOrchestratorClient {
         List<String> changedFiles,
         String patch,
         String resultZipBase64,
+        Boolean resultZipReady,
         String resultZipFilename,
         String pullRequestUrl,
         String error,
@@ -399,6 +400,7 @@ public class SandboxOrchestratorClient {
                 .toList();
 
             String resultZipBase64 = readText(node, "resultZipBase64", "result_zip_base64");
+            Boolean resultZipReady = readBoolean(node, "resultZipReady", "result_zip_ready");
             String resultZipFilename = readText(node, "resultZipFilename", "result_zip_filename");
 
             return new SandboxOrchestratorJobResponse(
@@ -408,6 +410,7 @@ public class SandboxOrchestratorClient {
                 files.isEmpty() ? null : files,
                 node.path("patch").asText(null),
                 resultZipBase64,
+                resultZipReady,
                 resultZipFilename,
                 resolvePullRequestUrl(node),
                 node.path("error").asText(null),
@@ -475,6 +478,25 @@ public class SandboxOrchestratorClient {
                         return Integer.parseInt(target.asText().trim());
                     } catch (NumberFormatException ignored) {
                         // noop
+                    }
+                }
+            }
+            return null;
+        }
+
+        private static Boolean readBoolean(JsonNode node, String... fields) {
+            for (String field : fields) {
+                JsonNode target = node.path(field);
+                if (target.isBoolean()) {
+                    return target.booleanValue();
+                }
+                if (target.isTextual()) {
+                    String value = target.asText().trim();
+                    if ("true".equalsIgnoreCase(value)) {
+                        return Boolean.TRUE;
+                    }
+                    if ("false".equalsIgnoreCase(value)) {
+                        return Boolean.FALSE;
                     }
                 }
             }
