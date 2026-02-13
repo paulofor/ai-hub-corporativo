@@ -90,6 +90,54 @@ class SandboxUploadServiceTest {
     }
 
     @Test
+    void getJobRefreshShouldNotPersistLargeInlineZip() {
+        SandboxUploadService constrainedService = new SandboxUploadService(
+            sandboxOrchestratorClient,
+            auditService,
+            uploadJobRepository,
+            100L,
+            tokenCostCalculator,
+            "gpt-5-codex",
+            "gpt-5-codex"
+        );
+
+        UploadJobRecord record = new UploadJobRecord();
+        record.setJobId("job-large");
+        record.setTaskDescription("Artefato grande");
+        record.setStatus("RUNNING");
+
+        byte[] zipBytes = new byte[128];
+        String base64 = java.util.Base64.getEncoder().encodeToString(zipBytes);
+
+        when(uploadJobRepository.findByJobId("job-large")).thenReturn(Optional.of(record));
+        when(sandboxOrchestratorClient.getJob("job-large")).thenReturn(new SandboxOrchestratorClient.SandboxOrchestratorJobResponse(
+            "job-large",
+            "COMPLETED",
+            "ok",
+            List.of(),
+            null,
+            base64,
+            Boolean.TRUE,
+            "resultado-grande.zip",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            BigDecimal.ZERO
+        ));
+
+        UploadJobView result = constrainedService.getJob("job-large", true);
+
+        assertThat(result.status()).isEqualTo("COMPLETED");
+        assertThat(result.resultZipReady()).isTrue();
+        assertThat(result.resultZipBase64()).isNull();
+        verify(uploadJobRepository).save(record);
+        assertThat(record.getResultZipBase64()).isNull();
+    }
+
+    @Test
     void getJobRefreshShouldMarkZipReadyWhenOrchestratorReturnsRemoteOnlyZip() {
         UploadJobRecord record = new UploadJobRecord();
         record.setJobId("job-zip");
